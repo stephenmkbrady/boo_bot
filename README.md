@@ -38,6 +38,11 @@ These instructions will get you a copy of the project up and running on your loc
 3.  **Install dependencies:**
 
     ```bash
+    # For Arch based systems:
+    pip install legacy-cgi
+    CMAKE_POLICY_VERSION_MINIMUM=3.5 pip install matrix-nio[e2e]
+    
+    # For every system:
     pip install -r requirements.txt
     ```
 

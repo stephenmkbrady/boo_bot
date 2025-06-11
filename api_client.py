@@ -189,7 +189,7 @@ class ChatDatabaseClient:
             print(f"❌ Get stats error: {e}")
             return None
     
-async def delete_message(self, message_id: int) -> bool:
+    async def delete_message(self, message_id: int) -> bool:
         """Delete a message from the database by ID
         XXX Issue 1: implement delete_message
         """

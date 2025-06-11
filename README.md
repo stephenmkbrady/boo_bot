@@ -65,6 +65,68 @@ python boo_bot.py
 
 The API will be accessible at `http://localhost:8000`.
 
+## Testing
+
+The project includes comprehensive test suites for both main modules.
+
+### Running Tests
+
+To run the test suite:
+
+```bash
+# Activate virtual environment
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+
+# Install test dependencies (if not already installed)
+pip install pytest pytest-asyncio pytest-cov
+
+# Run tests
+PYTHONPATH=. pytest tests/
+
+# Run tests with coverage
+PYTHONPATH=. pytest --cov=. --cov-report=html --cov-report=term-missing tests/
+```
+
+### Test Coverage
+
+Current test coverage as of the latest run:
+
+| Module | Coverage | Lines Covered | Lines Missing |
+|--------|----------|---------------|---------------|
+| **api_client.py** | **77%** | 106/137 | 31 |
+| **boo_bot.py** | **19%** | 211/1120 | 909 |
+| **tests/test_api_client.py** | **100%** | 212/212 | 0 |
+| **tests/test_boo_bot.py** | **100%** | 171/171 | 0 |
+| **TOTAL** | **43%** | 700/1640 | 940 |
+
+#### Coverage Details
+
+- **api_client.py**: Well-tested with 77% coverage. Missing coverage mainly in error handling edge cases and file upload functionality.
+- **boo_bot.py**: Requires significant test expansion (19% coverage). Most Matrix bot functionality, event handlers, and business logic need comprehensive testing.
+- **Test files**: Both test suites achieve 100% coverage, indicating thorough test execution.
+
+#### Viewing Detailed Coverage
+
+After running tests with coverage, open the HTML report:
+
+```bash
+# Open the coverage report in your browser
+open htmlcov/index.html  # On macOS
+xdg-open htmlcov/index.html  # On Linux
+start htmlcov/index.html  # On Windows
+```
+
+The HTML report provides:
+- Line-by-line coverage visualization
+- Interactive file navigation
+- Detailed missing line identification
+- Function and class coverage statistics
+
+### Test Structure
+
+- `tests/test_api_client.py`: Tests for the ChatDatabaseClient class including HTTP operations, error handling, and async functionality
+- `tests/test_boo_bot.py`: Tests for the DebugMatrixBot class including Matrix event handling and bot operations
+
 ## Technologies Used
 
 *   [matrix-nio](https://github.com/matrix-nio/matrix-nio) - Python Matrix client library

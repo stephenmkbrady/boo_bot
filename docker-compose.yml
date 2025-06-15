@@ -1,0 +1,21 @@
+services:
+  boo_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: boo_bot
+    env_file:
+      - .env
+    # Environment variables expected in the .env file:
+    # HOMESERVER="https://matrix.org"
+    # USER_ID="@your_user_id:matrix.org"
+    # PASSWORD="your_password"
+    # ROOM_ID="!your_room_id:matrix.org"
+    # DATABASE_API_URL="http://your_database_api_url"
+    # DATABASE_API_KEY="your_database_api_key"
+    # OPENROUTER_API_KEY="your_openrouter_api_key"
+    volumes:
+      # Persist bot_store and temp_media directories
+      - ./bot_store:/app/bot_store
+      - ./temp_media:/app/temp_media
+    restart: unless-stopped

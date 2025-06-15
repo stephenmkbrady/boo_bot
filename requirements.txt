@@ -1,6 +1,6 @@
 matrix-nio[e2e]
-httpx==0.25.2
-aiofiles==23.2.1
+httpx
+aiofiles
 python-dotenv
 python-dateutil
 cryptography

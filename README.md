@@ -81,10 +81,10 @@ source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 pip install pytest pytest-asyncio pytest-cov
 
 # Run tests
-PYTHONPATH=. pytest tests/
+PYTHONPATH=. ../venv/bin/pytest tests/
 
 # Run tests with coverage
-PYTHONPATH=. pytest --cov=. --cov-report=html --cov-report=term-missing tests/
+PYTHONPATH=. ../venv/bin/pytest --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing tests/
 ```
 
 ### Test Coverage
@@ -95,9 +95,7 @@ Current test coverage as of the latest run:
 |--------|----------|---------------|---------------|
 | **api_client.py** | **77%** | 106/137 | 31 |
 | **boo_bot.py** | **19%** | 211/1120 | 909 |
-| **tests/test_api_client.py** | **100%** | 212/212 | 0 |
-| **tests/test_boo_bot.py** | **100%** | 171/171 | 0 |
-| **TOTAL** | **43%** | 700/1640 | 940 |
+| **TOTAL** | **25%** | 317/1257 | 940 |
 
 #### Coverage Details
 
@@ -111,9 +109,9 @@ After running tests with coverage, open the HTML report:
 
 ```bash
 # Open the coverage report in your browser
-open htmlcov/index.html  # On macOS
-xdg-open htmlcov/index.html  # On Linux
-start htmlcov/index.html  # On Windows
+open boo_bot/coverage/htmlcov/index.html  # On macOS
+xdg-open boo_bot/coverage/htmlcov/index.html  # On Linux
+start boo_bot/coverage/htmlcov/index.html  # On Windows
 ```
 
 The HTML report provides:

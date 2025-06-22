@@ -19,3 +19,21 @@ services:
       - ./bot_store:/app/bot_store
       - ./temp_media:/app/temp_media
     restart: unless-stopped
+
+  boo_bot_tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: boo_bot_tests
+    env_file:
+      - .env
+    command: ["python", "-m", "pytest", "tests/", "-v"]
+    volumes:
+      # Mount test directories and source code for testing
+      - ./bot_store:/app/bot_store
+      - ./temp_media:/app/temp_media
+      - ./tests:/app/tests
+      - ./test_store:/app/test_store
+    profiles:
+      - test
+    restart: "no"

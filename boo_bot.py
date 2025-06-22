@@ -680,14 +680,7 @@ class DebugMatrixBot:
                             await self.send_message(room.room_id, f"{edit_prefix}{response}")
                             command_handled = True
                         else:
-                            # For compound commands like "8 question", try treating the number as the command
-                            if base_command.isdigit() and base_command == "8":
-                                response = await self.plugin_manager.handle_command(
-                                    "8ball", args, room.room_id, event.sender
-                                )
-                                if response:
-                                    await self.send_message(room.room_id, f"{edit_prefix}{response}")
-                                    command_handled = True
+                            pass
 
             # Fallback for unknown commands
             if not command_handled:

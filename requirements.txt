@@ -7,3 +7,4 @@ cryptography
 aiohttp
 pytest
 pytest-asyncio
+yt-dlp[default]

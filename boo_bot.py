@@ -116,6 +116,7 @@ try:
     from youtube_plugin import YouTubePlugin
     from ai_plugin import AIPlugin
     from core_plugin import CorePlugin
+    from database_plugin import DatabasePlugin
     print("✅ plugin system imported successfully")
     PLUGIN_SYSTEM_AVAILABLE = True
 except ImportError as e:
@@ -227,13 +228,6 @@ class DebugMatrixBot:
         else:
             print("⚠️ Media handler disabled")
 
-        # Initialize plugin system
-        self.plugin_manager = None
-        if PLUGIN_SYSTEM_AVAILABLE:
-            self._setup_plugins()
-        else:
-            print("⚠️ Plugin system disabled")
-
         # Dynamic bot name handling
         self.current_display_name = None  # No fallback
         self.last_name_check = None  # Track when we last checked the name
@@ -253,6 +247,13 @@ class DebugMatrixBot:
             self._init_database_client()
         else:
             print("⚠️ Database client not available - skipping initialization")
+
+        # Initialize plugin system (after database init)
+        self.plugin_manager = None
+        if PLUGIN_SYSTEM_AVAILABLE:
+            self._setup_plugins()
+        else:
+            print("⚠️ Plugin system disabled")
 
         # Add event callbacks for ALL message types + debugging
         try:
@@ -331,6 +332,12 @@ class DebugMatrixBot:
                 ai_plugin = AIPlugin()
                 self.plugin_manager.add_plugin(ai_plugin)
                 print("✅ AI plugin added")
+            
+            # Add database plugin if enabled
+            if self.db_enabled:
+                database_plugin = DatabasePlugin(bot_instance=self)
+                self.plugin_manager.add_plugin(database_plugin)
+                print("✅ Database plugin added")
                 
             print(f"✅ Plugin system initialized with {len(self.plugin_manager.plugins)} plugins")
             
@@ -652,203 +659,38 @@ class DebugMatrixBot:
                 return command_lower == expected
 
             # Try plugin system first
+            command_handled = False
             if self.plugin_manager:
                 # Extract command and args from the command text
-                command_parts = command_lower.replace(prefix, "").strip().split(" ", 1)
-                if command_parts:
-                    base_command = command_parts[0]
-                    args = command_parts[1] if len(command_parts) > 1 else ""
+                # Use lowercase version for command detection, but preserve original case for arguments
+                if command_lower.startswith(prefix):
+                    # Remove prefix from original command to preserve case in arguments
+                    remaining_command = command[len(prefix):].strip()
+                    command_parts = remaining_command.split(" ", 1)
+                    if command_parts:
+                        base_command = command_parts[0].lower()  # Command itself should be lowercase for matching
+                        args = command_parts[1] if len(command_parts) > 1 else ""  # Args preserve original case
                     
-                    # Try to handle with plugin system
-                    response = await self.plugin_manager.handle_command(
-                        base_command, args, room.room_id, event.sender
-                    )
-                    
-                    if response:
-                        await self.send_message(room.room_id, f"{edit_prefix}{response}")
-                        return
+                        # Try to handle with plugin system
+                        response = await self.plugin_manager.handle_command(
+                            base_command, args, room.room_id, event.sender
+                        )
+                        
+                        if response:
+                            await self.send_message(room.room_id, f"{edit_prefix}{response}")
+                            command_handled = True
+                        else:
+                            # For compound commands like "8 question", try treating the number as the command
+                            if base_command.isdigit() and base_command == "8":
+                                response = await self.plugin_manager.handle_command(
+                                    "8ball", args, room.room_id, event.sender
+                                )
+                                if response:
+                                    await self.send_message(room.room_id, f"{edit_prefix}{response}")
+                                    command_handled = True
 
-            # Fallback to existing command handling for commands not handled by plugins
-            if matches_exact("debug"):
-                debug_info = f"""{edit_prefix}🔍 **SIMPLIFIED DEBUG INFO**
-
-📊 **Event Counters:**
-• Text messages: {self.event_counters['text_messages']}
-• Media messages: {self.event_counters['media_messages']}
-• Unknown events: {self.event_counters['unknown_events']}
-• Encrypted events: {self.event_counters['encrypted_events']}
-• Decryption failures: {self.event_counters['decryption_failures']}
-
-🤖 **Bot Identity:**
-• Display name: {self.current_display_name}
-• Command format: {self.current_display_name}: <command>
-
-🔧 **Configuration:**
-• Database enabled: {'✅ Yes' if self.db_enabled else '❌ No'}
-• aiohttp available: {'✅ Yes' if AIOHTTP_AVAILABLE else '❌ No'}
-• Cryptography library: {'✅ Yes' if CRYPTO_AVAILABLE else '❌ No'}
-• Encrypted events support: {'✅ Yes' if ENCRYPTED_EVENTS_AVAILABLE else '❌ No'}
-• Room encrypted: {'🔒 Yes' if room.encrypted else '🔓 No'}
-• Store path: {self.store_path}
-• Temp media dir: {self.temp_media_dir}
-
-✅ **Simplified Features:**
-• Media processing with MIME preservation
-• NIST Beacon integration for randomness
-• YouTube summary functionality
-• Enhanced encrypted media decryption
-"""
-
-                await self.send_message(room.room_id, debug_info)
-
-            elif matches_exact("talk"):
-                await self.send_message(room.room_id, f"{edit_prefix}Hello! I'm {self.current_display_name} - the simplified bot with proper encrypted media decryption!")
-
-            elif matches_exact("help"):
-                help_text = f"""{edit_prefix}🔍 **{self.current_display_name.upper()} BOT Commands:**
-• {self.current_display_name}: debug - Show debug information
-• {self.current_display_name}: talk - Say hello
-• {self.current_display_name}: help - Show this help
-• {self.current_display_name}: ping - Test responsiveness
-• {self.current_display_name}: room - Show room info
-• {self.current_display_name}: db health - Check database
-• {self.current_display_name}: db stats - Database statistics
-• {self.current_display_name}: 8 [question] - Magic 8-ball fortune (uses NIST Beacon!)
-• {self.current_display_name}: bible - Get a random Bible verse (uses NIST Beacon!)
-• {self.current_display_name}: bible song - Get a Bible verse + related song (uses NIST Beacon!)
-• {self.current_display_name}: advise <question> - Get serious, thoughtful advice (uses NIST Beacon!)
-• {self.current_display_name}: advice <question> - Get funny, unconventional advice (uses NIST Beacon!)"""
-
-                if AIOHTTP_AVAILABLE and os.getenv("OPENROUTER_API_KEY"):
-                    help_text += f"\n• {self.current_display_name}: summary <youtube_url> - Summarize YouTube video"
-                    help_text += f"\n• {self.current_display_name}: subs <youtube_url> - Extract closed captions from YouTube video"
-                    help_text += f"\n• {self.current_display_name}: ask <question> - Ask about the most recent YouTube video"
-                    help_text += f"\n• {self.current_display_name}: ask <youtube_url> <question> - Ask about a specific YouTube video"
-                    help_text += f"\n• {self.current_display_name}: videos - List recently processed videos"
-
-                await self.send_message(room.room_id, help_text)
-
-            elif matches_exact("ping"):
-                edit_note = " (responding to edit)" if is_edit else ""
-                await self.send_message(room.room_id, f"{edit_prefix}{self.current_display_name.title()} Pong! 🏓 (from {event.sender}){edit_note}")
-
-            elif matches_exact("room"):
-                member_count = len(room.users)
-                encrypted = "🔒 Encrypted" if room.encrypted else "🔓 Not encrypted"
-                room_info = f"""{edit_prefix}🏠 **Room Debug Info:**
-• Name: {room.name}
-• Members: {member_count}
-• Status: {encrypted}
-• Room ID: {room.room_id}
-• Bot events received: {sum(self.event_counters.values())}
-• Bot name: {self.current_display_name}
-• Media decryption: ✅ Enhanced
-• Version: Simplified with dynamic naming"""
-
-                await self.send_message(room.room_id, room_info)
-
-            elif matches_exact("db health"):
-                await self.handle_db_health_check(room.room_id, is_edit)
-
-            elif matches_exact("db stats"):
-                await self.handle_db_stats(room.room_id, is_edit)
-
-            elif matches_command("8"):
-                if not self.ai_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
-                    return
-                question = None
-                command_start = f"{prefix} 8"
-                if len(command) > len(command_start):
-                    question = command[len(command_start):].strip()
-                await self.ai_processor.handle_magic_8ball(room.room_id, question, is_edit, send_message_func=self.send_message)
-
-            elif matches_exact("bible"):
-                if not self.ai_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
-                    return
-                await self.ai_processor.handle_bible_verse(room.room_id, is_edit, send_message_func=self.send_message)
-
-            elif matches_exact("bible song"):
-                if not self.ai_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
-                    return
-                await self.ai_processor.handle_bible_song(room.room_id, is_edit, send_message_func=self.send_message, create_youtube_url_func=create_Youtube_url)
-
-            elif matches_command("advise") or matches_command("advice"):
-                if not self.ai_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
-                    return
-                is_serious = matches_command("advise")
-                command_start = f"{prefix} {'advise' if is_serious else 'advice'}"
-                
-                if len(command) > len(command_start):
-                    advice_question = command[len(command_start):].strip()
-                    if advice_question:
-                        await self.ai_processor.handle_advice_request(room.room_id, advice_question, is_edit, is_serious, send_message_func=self.send_message)
-                    else:
-                        command_type = "advise" if is_serious else "advice"
-                        error_msg = f"{edit_prefix}Please provide a question for advice. Usage: {self.current_display_name}: {command_type} <your question>"
-                        await self.send_message(room.room_id, error_msg)
-                else:
-                    command_type = "advise" if is_serious else "advice"
-                    error_msg = f"{edit_prefix}Please provide a question for advice. Usage: {self.current_display_name}: {command_type} <your question>"
-                    await self.send_message(room.room_id, error_msg)
-
-            elif matches_command("summary"):
-                if not self.youtube_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ YouTube features not available. Missing dependencies.")
-                    return
-                command_start = f"{prefix} summary"
-                if len(command) > len(command_start):
-                    url = command[len(command_start):].strip()
-                    if url:
-                        await self.youtube_processor.handle_youtube_summary(room.room_id, url, is_edit, send_message_func=self.send_message)
-                    else:
-                        await self.send_message(room.room_id, f"{edit_prefix}Please provide a YouTube URL. Usage: {self.current_display_name}: summary <youtube_url>")
-                else:
-                    await self.send_message(room.room_id, f"{edit_prefix}Please provide a YouTube URL. Usage: {self.current_display_name}: summary <youtube_url>")
-
-            elif matches_command("subs"):
-                if not self.youtube_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ YouTube features not available. Missing dependencies.")
-                    return
-                command_start = f"{prefix} subs"
-                if len(command) > len(command_start):
-                    url = command[len(command_start):].strip()
-                    if url:
-                        await self.youtube_processor.handle_youtube_subs(room.room_id, url, is_edit, send_message_func=self.send_message, send_file_attachment_func=self.media_processor.send_file_attachment if self.media_processor else None)
-                    else:
-                        await self.send_message(room.room_id, f"{edit_prefix}Please provide a YouTube URL. Usage: {self.current_display_name}: subs <youtube_url>")
-                else:
-                    await self.send_message(room.room_id, f"{edit_prefix}Please provide a YouTube URL. Usage: {self.current_display_name}: subs <youtube_url>")
-
-            elif matches_command("ask"):
-                if not self.youtube_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ YouTube features not available. Missing dependencies.")
-                    return
-                command_start = f"{prefix} ask"
-                if len(command) > len(command_start):
-                    question_part = command[len(command_start):].strip()
-                    await self.youtube_processor.handle_youtube_question(room.room_id, question_part, is_edit, send_message_func=self.send_message, current_display_name=self.current_display_name)
-                else:
-                    await self.send_message(room.room_id, f"{edit_prefix}Please provide a question. Usage: {self.current_display_name}: ask <question>")
-
-            elif matches_exact("videos"):
-                if not self.youtube_processor:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ YouTube features not available. Missing dependencies.")
-                    return
-                await self.youtube_processor.handle_list_videos(room.room_id, is_edit, send_message_func=self.send_message, current_display_name=self.current_display_name)
-
-            elif matches_exact("refresh name") or matches_exact("update name"):
-                old_name = self.current_display_name
-                success = await self.update_command_prefix()
-                if success:
-                    await self.send_message(room.room_id, f"{edit_prefix}🔄 **Name refresh completed!**\nOld name: `{old_name}`\nNew name: `{self.current_display_name}`")
-                else:
-                    await self.send_message(room.room_id, f"{edit_prefix}❌ **Name refresh failed!**\nCould not retrieve display name from Matrix.")
-
-            else:
+            # Fallback for unknown commands
+            if not command_handled:
                 unknown_msg = f"{edit_prefix}Unknown command. Try '{self.current_display_name}: help' or '{self.current_display_name}: debug'"
                 await self.send_message(room.room_id, unknown_msg)
 

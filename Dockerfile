@@ -44,6 +44,7 @@ COPY plugin_manager.py .
 COPY youtube_plugin.py .
 COPY ai_plugin.py .
 COPY core_plugin.py .
+COPY database_plugin.py .
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store && \

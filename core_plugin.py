@@ -8,7 +8,7 @@ class CorePlugin(BotPlugin):
         self.bot = bot_instance
     
     def get_commands(self) -> List[str]:
-        return ["debug", "talk", "help", "ping", "room", "refresh", "update"]
+        return ["debug", "talk", "help", "ping", "room", "refresh", "update", "name"]
     
     async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
         if not self.bot:
@@ -26,6 +26,8 @@ class CorePlugin(BotPlugin):
             elif command == "room":
                 return await self._handle_room_command(room_id)
             elif command in ["refresh", "update"] and args == "name":
+                return await self._handle_refresh_name_command()
+            elif command == "name" and args in ["refresh", "update"]:
                 return await self._handle_refresh_name_command()
         except Exception as e:
             return f"❌ Error processing {command} command: {str(e)}"

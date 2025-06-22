@@ -25,14 +25,55 @@ class YouTubePlugin(BotPlugin):
             return "❌ YouTube functionality not available"
         
         try:
+            # All YouTube handler methods need send_message_func, but we return the response instead
+            # So we need to capture the response rather than letting it send directly
+            
             if command == "summary":
-                return await self.handler.handle_youtube_summary(room_id, args)
+                if not args:
+                    return "❌ Please provide a YouTube URL. Usage: summary <youtube_url>"
+                
+                response_container = []
+                async def capture_response(room_id, message):
+                    response_container.append(message)
+                
+                await self.handler.handle_youtube_summary(room_id, args, False, capture_response)
+                # Return all messages joined together
+                return "\n".join(response_container) if response_container else "❌ No summary available"
+                
             elif command == "subs":
-                return await self.handler.handle_youtube_subs(room_id, args) 
+                if not args:
+                    return "❌ Please provide a YouTube URL. Usage: subs <youtube_url>"
+                
+                response_container = []
+                async def capture_response(room_id, message):
+                    response_container.append(message)
+                
+                # Note: subs may also send file attachments, but for now we'll just capture text responses
+                await self.handler.handle_youtube_subs(room_id, args, False, capture_response, None)
+                # Return all messages joined together
+                return "\n".join(response_container) if response_container else "❌ No subtitles available"
+                
             elif command == "ask":
-                return await self.handler.handle_youtube_question(room_id, args)
+                if not args:
+                    return "❌ Please provide a question. Usage: ask <question> or ask <youtube_url> <question>"
+                
+                response_container = []
+                async def capture_response(room_id, message):
+                    response_container.append(message)
+                
+                await self.handler.handle_youtube_question(room_id, args, False, capture_response, "bot")
+                # Return all messages joined together
+                return "\n".join(response_container) if response_container else "❌ No answer available"
+                
             elif command == "videos":
-                return await self.handler.handle_youtube_videos(room_id, args)
+                response_container = []
+                async def capture_response(room_id, message):
+                    response_container.append(message)
+                
+                await self.handler.handle_list_videos(room_id, False, capture_response, "bot")
+                # Return all messages joined together
+                return "\n".join(response_container) if response_container else "❌ No videos found"
+                
         except Exception as e:
             return f"❌ Error processing {command} command: {str(e)}"
         

@@ -318,34 +318,47 @@ Focus on the spiritual, emotional, or thematic connection. Choose well-known son
                 content = f.read()
 
             verses = []
-            current_book = ""
-            current_chapter = ""
-
+            
             for line in content.split('\n'):
                 line = line.strip()
-                if not line:
+                if not line or line.startswith('KJV') or line.startswith('King James'):
                     continue
-
-                # Check if this is a book/chapter header (all caps or starts with number)
-                if line.isupper() or (len(line.split()) >= 2 and line.split()[0].isdigit()):
-                    if line.isupper():
-                        current_book = line
-                        current_chapter = ""
-                    elif line.split()[0].isdigit():
-                        current_chapter = line
-                    continue
-
-                # This should be a verse
-                if ':' in line and current_book and current_chapter:
-                    try:
-                        verse_num = line.split(':')[0].strip()
-                        verse_text = ':'.join(line.split(':')[1:]).strip()
-                        if verse_num.isdigit() and verse_text:
-                            full_reference = f"{current_book} {current_chapter}:{verse_num}"
-                            verses.append((full_reference, verse_text))
-                    except:
-                        continue
-
+                    
+                # The actual format is: "Book Chapter:Verse<tab>text" or "Book Chapter:Verse text"
+                if ':' in line:
+                    # Split on tab first, then fallback to space splitting
+                    if '\t' in line:
+                        parts = line.split('\t', 1)
+                        reference = parts[0].strip()
+                        verse_text = parts[1].strip()
+                    else:
+                        # Fallback: find the first space after the verse number
+                        colon_pos = line.find(':')
+                        if colon_pos > 0:
+                            # Find the first space or tab after the verse number
+                            remaining = line[colon_pos + 1:]
+                            space_pos = -1
+                            for i, char in enumerate(remaining):
+                                if char in [' ', '\t'] and remaining[:i].strip().isdigit():
+                                    space_pos = i
+                                    break
+                            
+                            if space_pos > 0:
+                                reference = line[:colon_pos + 1 + space_pos].strip()
+                                verse_text = line[colon_pos + 1 + space_pos:].strip()
+                            else:
+                                # Try splitting on the first space after colon
+                                after_colon = line[colon_pos + 1:]
+                                first_space = after_colon.find(' ')
+                                if first_space > 0 and after_colon[:first_space].isdigit():
+                                    reference = line[:colon_pos + 1 + first_space].strip()
+                                    verse_text = after_colon[first_space:].strip()
+                                else:
+                                    continue
+                    
+                    if reference and verse_text and reference.count(':') == 1:
+                        verses.append((reference, verse_text))
+                        
             return verses
 
         except Exception as e:

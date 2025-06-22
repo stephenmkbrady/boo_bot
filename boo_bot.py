@@ -2519,7 +2519,7 @@ async def main():
                 await bot.trust_all_room_devices(ROOM_ID)
 
                 # Send startup message
-                startup_msg = f"""🔍 **SIMPLIFIED Matrix Bot Started!**
+                startup_msg = f"""🔍 **Matrix Bot Started!**
 
 🤖 **Available Commands:**
 Type `boo help` for full command list

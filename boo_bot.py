@@ -74,6 +74,16 @@ except ImportError as e:
         def __init__(self, *args, **kwargs):
             pass
 
+# Try to import youtube handler
+try:
+    from youtube_handler import youtube_handler, create_Youtube_url
+    print("✅ youtube_handler imported successfully")
+    YOUTUBE_HANDLER_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Warning: Could not import youtube_handler: {e}")
+    print("YouTube audio download features will be disabled.")
+    YOUTUBE_HANDLER_AVAILABLE = False
+
 try:
     import aiohttp
     import aiofiles
@@ -1613,28 +1623,6 @@ Answer:"""
             print(f"Error parsing Bible file: {e}")
             return []
 
-    def create_Youtube_url(self, song_text):
-        """Create a Youtube URL from song title and artist"""
-        try:
-            import urllib.parse
-
-            clean_text = song_text.replace('"', '').replace("'", '').strip()
-
-            if ' by ' in clean_text:
-                parts = clean_text.split(' by ', 1)
-                song_title = parts[0].strip()
-                artist = parts[1].strip()
-                search_query = f"{artist} {song_title}"
-            else:
-                search_query = clean_text
-
-            encoded_query = urllib.parse.quote_plus(search_query)
-            youtube_url = f"https://www.youtube.com/results?search_query={encoded_query}"
-            return youtube_url
-
-        except Exception as e:
-            print(f"Error creating Youtube URL: {e}")
-            return f"https://www.youtube.com/results?search_query={song_text.replace(' ', '+')}"
 
     async def find_thematic_song(self, bible_text):
         """Find a song that shares thematic elements with the Bible verse"""
@@ -1654,7 +1642,7 @@ Do NOT include any YouTube links or URLs. Just the song title and artist."""
                     if response.status == 200:
                         data = await response.json()
                         song_rec = data['choices'][0]['message']['content'].strip().strip('"').strip("'").strip()
-                        youtube_url = self.create_Youtube_url(song_rec)
+                        youtube_url = create_Youtube_url(song_rec)
                         return f"{song_rec}\nYoutube: {youtube_url}"
                     else:
                         print(f"OpenRouter API error {response.status}")

@@ -4,6 +4,7 @@ import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from datetime import datetime, timedelta
 from boo_bot import DebugMatrixBot
+from youtube_handler import create_Youtube_url
 
 # Mock the nio.AsyncClient and other external dependencies
 @pytest.fixture
@@ -62,6 +63,10 @@ async def bot_instance(mock_nio_asyncclient, mock_chat_database_client, mock_env
     # and we want to ensure it's enabled for tests that rely on it.
     bot.db_enabled = True
     bot.db_client = mock_chat_database_client
+    
+    # Set the display name for command processing - this is what the tests expect
+    bot.current_display_name = "boo"
+    
     yield bot
 
 # Test for parse_vtt
@@ -96,22 +101,19 @@ def test_parse_vtt_no_text():
 
 # Test for create_Youtube_url
 def test_create_youtube_url_with_artist():
-    bot = DebugMatrixBot("h", "u", "p")
     song_text = '"Bohemian Rhapsody" by Queen'
     expected_url = "https://www.youtube.com/results?search_query=Queen+Bohemian+Rhapsody"
-    assert bot.create_Youtube_url(song_text) == expected_url
+    assert create_Youtube_url(song_text) == expected_url
 
 def test_create_youtube_url_without_artist():
-    bot = DebugMatrixBot("h", "u", "p")
     song_text = "Imagine"
     expected_url = "https://www.youtube.com/results?search_query=Imagine"
-    assert bot.create_Youtube_url(song_text) == expected_url
+    assert create_Youtube_url(song_text) == expected_url
 
 def test_create_youtube_url_special_chars():
-    bot = DebugMatrixBot("h", "u", "p")
     song_text = "Song & Dance (Live!)"
     expected_url = "https://www.youtube.com/results?search_query=Song+%26+Dance+%28Live%21%29"
-    assert bot.create_Youtube_url(song_text) == expected_url
+    assert create_Youtube_url(song_text) == expected_url
 
 # Test for handle_bot_command (basic)
 @pytest.mark.asyncio
@@ -124,10 +126,10 @@ async def test_handle_bot_command_debug(bot_instance, mock_nio_asyncclient):
 
     mock_event = MagicMock()
     mock_event.sender = "@otheruser:matrix.org"
-    mock_event.body = "boo debug"
+    mock_event.body = "boo: debug"
     mock_event.relates_to = None # Not an edit
 
-    await bot_instance.handle_bot_command(mock_room, mock_event, "boo debug")
+    await bot_instance.handle_bot_command(mock_room, mock_event, "boo: debug")
 
     mock_nio_asyncclient.room_send.assert_called()
     args, kwargs = mock_nio_asyncclient.room_send.call_args
@@ -140,15 +142,15 @@ async def test_handle_bot_command_talk(bot_instance, mock_nio_asyncclient):
     mock_room.room_id = "!test:matrix.org"
     mock_event = MagicMock()
     mock_event.sender = "@otheruser:matrix.org"
-    mock_event.body = "boo talk"
+    mock_event.body = "boo: talk"
     mock_event.relates_to = None
 
-    await bot_instance.handle_bot_command(mock_room, mock_event, "boo talk")
+    await bot_instance.handle_bot_command(mock_room, mock_event, "boo: talk")
 
     mock_nio_asyncclient.room_send.assert_called_once_with(
         room_id="!test:matrix.org",
         message_type="m.room.message",
-        content={"msgtype": "m.text", "body": "Hello! I'm the simplified version of boo with proper encrypted media decryption!"},
+        content={"msgtype": "m.text", "body": "Hello! I'm boo - the simplified bot with proper encrypted media decryption!"},
         ignore_unverified_devices=True
     )
 
@@ -158,15 +160,15 @@ async def test_handle_bot_command_unknown(bot_instance, mock_nio_asyncclient):
     mock_room.room_id = "!test:matrix.org"
     mock_event = MagicMock()
     mock_event.sender = "@otheruser:matrix.org"
-    mock_event.body = "boo unknown"
+    mock_event.body = "boo: unknown"
     mock_event.relates_to = None
 
-    await bot_instance.handle_bot_command(mock_room, mock_event, "boo unknown")
+    await bot_instance.handle_bot_command(mock_room, mock_event, "boo: unknown")
 
     mock_nio_asyncclient.room_send.assert_called_once_with(
         room_id="!test:matrix.org",
         message_type="m.room.message",
-        content={"msgtype": "m.text", "body": "Unknown command. Try 'boo help' or 'boo debug'"},
+        content={"msgtype": "m.text", "body": "Unknown command. Try 'boo: help' or 'boo: debug'"},
         ignore_unverified_devices=True
     )
 

@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict
-from plugin_base import BotPlugin
+from .plugin_base import BotPlugin
 
 
 class PluginManager:

@@ -1,7 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from api_client import ChatDatabaseClient
+from plugins.database_plugin import ChatDatabaseClient
 import aiohttp
 import aiofiles
 from pathlib import Path

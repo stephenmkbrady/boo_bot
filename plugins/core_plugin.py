@@ -1,6 +1,6 @@
 from typing import List, Optional
 import logging
-from plugin_base import BotPlugin
+from .plugin_base import BotPlugin
 
 
 class CorePlugin(BotPlugin):

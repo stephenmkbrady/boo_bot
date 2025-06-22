@@ -1,15 +1,12 @@
-#!/usr/bin/env python3
-"""
-Matrix Chat Database API Client - Simplified Version
-Removed membership verification and token management features
-"""
-
+from typing import List, Optional, Dict, Any
+import logging
 import aiohttp
 import aiofiles
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from .plugin_base import BotPlugin
+
 
 class ChatDatabaseClient:
     """Simplified client for interacting with the Matrix Chat Database API"""
@@ -190,9 +187,7 @@ class ChatDatabaseClient:
             return None
     
     async def delete_message(self, message_id: int) -> bool:
-        """Delete a message from the database by ID
-        XXX Issue 1: implement delete_message
-        """
+        """Delete a message from the database by ID"""
         try:
             url = f"{self.base_url}/messages/{message_id}"
             print(f"🗑️ Deleting message ID: {message_id}")
@@ -214,42 +209,75 @@ class ChatDatabaseClient:
             print(f"❌ Delete message error: {e}")
             return False
 
-# Test function for the simplified client
-async def test_client():
-    """Test the API client"""
-    import os
-    from dotenv import load_dotenv
-    
-    load_dotenv()
-    
-    api_url = os.getenv("DATABASE_API_URL")
-    api_key = os.getenv("DATABASE_API_KEY")
-    
-    if not api_url or not api_key:
-        print("❌ Missing DATABASE_API_URL or DATABASE_API_KEY in .env")
-        return
-    
-    print(f"🧪 Testing simplified API client...")
-    print(f"📡 URL: {api_url}")
-    print(f"🔑 Key: {api_key[:10]}...")
-    
-    client = ChatDatabaseClient(api_url, api_key)
-    
-    # Test health check
-    print("\n🏥 Testing health check...")
-    is_healthy = await client.health_check()
-    print(f"Health status: {'✅ Healthy' if is_healthy else '❌ Unhealthy'}")
-    
-    # Test stats
-    print("\n📊 Testing stats...")
-    stats = await client.get_database_stats()
-    if stats:
-        print(f"✅ Stats retrieved: {stats}")
-    else:
-        print("❌ Failed to get stats")
-    
-    print("\n✅ Simplified API client test completed")
 
-if __name__ == "__main__":
-    import asyncio
-    asyncio.run(test_client())
+class DatabasePlugin(BotPlugin):
+    def __init__(self, bot_instance=None):
+        super().__init__("database")
+        self.bot = bot_instance
+        self.logger = logging.getLogger(f"plugin.{self.name}")
+        # Only enable if database is available
+        self.enabled = bot_instance and getattr(bot_instance, 'db_enabled', False)
+    
+    def get_commands(self) -> List[str]:
+        return ["db"]
+    
+    async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+        self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
+        
+        if not self.bot or not self.enabled:
+            self.logger.error("Database functionality not available")
+            return "❌ Database functionality not available"
+        
+        try:
+            if command == "db":
+                if args == "health":
+                    return await self._handle_db_health()
+                elif args == "stats":
+                    return await self._handle_db_stats()
+                else:
+                    return "❌ Unknown database command. Use 'db health' or 'db stats'"
+        except Exception as e:
+            self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)
+            return f"❌ Error processing database command"
+        
+        return None
+    
+    async def _handle_db_health(self) -> str:
+        """Handle database health check"""
+        try:
+            if not self.bot.db_client:
+                return "❌ Database client not available"
+            
+            # health_check returns a boolean, not a dict
+            is_healthy = await self.bot.db_client.health_check()
+            
+            if is_healthy:
+                return "✅ Database is healthy!"
+            else:
+                return "❌ Database is unhealthy"
+                
+        except Exception as e:
+            return f"❌ Database health check failed: {str(e)}"
+    
+    async def _handle_db_stats(self) -> str:
+        """Handle database statistics"""
+        try:
+            if not self.bot.db_client:
+                return "❌ Database client not available"
+            
+            stats = await self.bot.db_client.get_database_stats()
+            
+            if stats:
+                total_messages = stats.get('total_messages', 'Unknown')
+                total_media_files = stats.get('total_media_files', 'Unknown')
+                database_size = stats.get('database_size', 'Unknown')
+                
+                return f"""📊 **DATABASE STATISTICS**
+💬 Total Messages: {total_messages}
+📎 Total Media Files: {total_media_files}
+💾 Database Size: {database_size}"""
+            else:
+                return "❌ Could not retrieve database statistics"
+                
+        except Exception as e:
+            return f"❌ Database stats failed: {str(e)}"

@@ -32,21 +32,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY boo_bot.py .
-COPY api_client.py .
 COPY kjv.txt .
 COPY tests/ tests/
 COPY config/ config/
 COPY youtube_handler.py .
-COPY ai_handler.py .
 COPY media_handler.py .
 COPY config.py .
 COPY logging_setup.py .
-COPY plugin_base.py .
-COPY plugin_manager.py .
-COPY youtube_plugin.py .
-COPY ai_plugin.py .
-COPY core_plugin.py .
-COPY database_plugin.py .
+COPY plugins/ plugins/
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store logs && \

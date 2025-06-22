@@ -59,14 +59,14 @@ except ImportError as e:
     print("Install with: pip install matrix-nio")
     exit(1)
 
-# Try to import our database client with better error handling
+# Database client now embedded in database plugin
 try:
-    from api_client import ChatDatabaseClient
-    print("✅ ChatDatabaseClient imported successfully")
+    from plugins.database_plugin import ChatDatabaseClient
+    print("✅ ChatDatabaseClient imported successfully from database plugin")
     DATABASE_CLIENT_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Warning: Could not import ChatDatabaseClient: {e}")
-    print("Database features will be disabled. Make sure api_client.py exists in the same directory.")
+    print(f"⚠️ Warning: Could not import ChatDatabaseClient from database plugin: {e}")
+    print("Database features will be disabled.")
     DATABASE_CLIENT_AVAILABLE = False
 
     # Create a dummy class so the code doesn't crash
@@ -84,14 +84,24 @@ except ImportError as e:
     print("YouTube audio download features will be disabled.")
     YOUTUBE_HANDLER_AVAILABLE = False
 
+print("🔍 About to import AI functionality...")
+# AI functionality now embedded in ai_plugin
 try:
-    from ai_handler import AIProcessor
-    print("✅ ai_handler imported successfully")
+    print("🔍 Attempting to import AIProcessor...")
+    from plugins.ai_plugin import AIProcessor
     AI_HANDLER_AVAILABLE = True
+    print("✅ AI functionality available via plugin system")
+    print(f"✅ AIProcessor class available: {AIProcessor}")
 except ImportError as e:
-    print(f"⚠️ Warning: Could not import ai_handler: {e}")
-    print("AI features will be disabled.")
+    print(f"⚠️ Warning: Could not import AIProcessor from ai_plugin: {e}")
     AI_HANDLER_AVAILABLE = False
+    AIProcessor = None
+except Exception as e:
+    print(f"❌ Unexpected error importing AIProcessor: {e}")
+    import traceback
+    traceback.print_exc()
+    AI_HANDLER_AVAILABLE = False
+    AIProcessor = None
 
 try:
     from media_handler import MediaProcessor
@@ -121,11 +131,11 @@ except ImportError as e:
     LOGGING_AVAILABLE = False
 
 try:
-    from plugin_manager import PluginManager
-    from youtube_plugin import YouTubePlugin
-    from ai_plugin import AIPlugin
-    from core_plugin import CorePlugin
-    from database_plugin import DatabasePlugin
+    from plugins.plugin_manager import PluginManager
+    from plugins.youtube_plugin import YouTubePlugin
+    from plugins.ai_plugin import AIPlugin
+    from plugins.core_plugin import CorePlugin
+    from plugins.database_plugin import DatabasePlugin
     print("✅ plugin system imported successfully")
     PLUGIN_SYSTEM_AVAILABLE = True
 except ImportError as e:

@@ -71,6 +71,7 @@ async def bot_instance(mock_nio_asyncclient, mock_chat_database_client, mock_env
 
 # Test for parse_vtt
 def test_parse_vtt():
+    from youtube_handler import YouTubeProcessor
     vtt_content = """WEBVTT
 
 00:00:01.000 --> 00:00:03.000
@@ -83,21 +84,23 @@ This is a test.
 <c.red>Red text</c> and <b>bold</b> text.
 """
     expected_text = "Hello world. This is a test. Red text and bold text."
-    bot = DebugMatrixBot("h", "u", "p") # Dummy bot instance for method access
-    assert bot.parse_vtt(vtt_content) == expected_text
+    processor = YouTubeProcessor()
+    assert processor.parse_vtt(vtt_content) == expected_text
 
 def test_parse_vtt_empty():
+    from youtube_handler import YouTubeProcessor
     vtt_content = "WEBVTT\n\n"
-    bot = DebugMatrixBot("h", "u", "p")
-    assert bot.parse_vtt(vtt_content) == ""
+    processor = YouTubeProcessor()
+    assert processor.parse_vtt(vtt_content) == ""
 
 def test_parse_vtt_no_text():
+    from youtube_handler import YouTubeProcessor
     vtt_content = """WEBVTT
 
 00:00:01.000 --> 00:00:03.000
 """
-    bot = DebugMatrixBot("h", "u", "p")
-    assert bot.parse_vtt(vtt_content) == ""
+    processor = YouTubeProcessor()
+    assert processor.parse_vtt(vtt_content) == ""
 
 # Test for create_Youtube_url
 def test_create_youtube_url_with_artist():

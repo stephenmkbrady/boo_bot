@@ -85,6 +85,15 @@ except ImportError as e:
     YOUTUBE_HANDLER_AVAILABLE = False
 
 try:
+    from ai_handler import AIProcessor
+    print("✅ ai_handler imported successfully")
+    AI_HANDLER_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Warning: Could not import ai_handler: {e}")
+    print("AI features will be disabled.")
+    AI_HANDLER_AVAILABLE = False
+
+try:
     import aiohttp
     import aiofiles
     AIOHTTP_AVAILABLE = True
@@ -148,6 +157,12 @@ class DebugMatrixBot:
             self.youtube_processor = YouTubeProcessor()
         else:
             self.youtube_processor = None
+
+        # AI functionality
+        if AI_HANDLER_AVAILABLE:
+            self.ai_processor = AIProcessor()
+        else:
+            self.ai_processor = None
 
         # Dynamic bot name handling
         self.current_display_name = None  # No fallback
@@ -986,26 +1001,38 @@ class DebugMatrixBot:
                 await self.handle_db_stats(room.room_id, is_edit)
 
             elif matches_command("8"):
+                if not self.ai_processor:
+                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
+                    return
                 question = None
                 command_start = f"{prefix} 8"
                 if len(command) > len(command_start):
                     question = command[len(command_start):].strip()
-                await self.handle_magic_8ball(room.room_id, question, is_edit)
+                await self.ai_processor.handle_magic_8ball(room.room_id, question, is_edit, send_message_func=self.send_message)
 
             elif matches_exact("bible"):
-                await self.handle_bible_verse(room.room_id, is_edit)
+                if not self.ai_processor:
+                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
+                    return
+                await self.ai_processor.handle_bible_verse(room.room_id, is_edit, send_message_func=self.send_message)
 
             elif matches_exact("bible song"):
-                await self.handle_bible_song(room.room_id, is_edit)
+                if not self.ai_processor:
+                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
+                    return
+                await self.ai_processor.handle_bible_song(room.room_id, is_edit, send_message_func=self.send_message, create_youtube_url_func=create_Youtube_url)
 
             elif matches_command("advise") or matches_command("advice"):
+                if not self.ai_processor:
+                    await self.send_message(room.room_id, f"{edit_prefix}❌ AI features not available. Missing dependencies.")
+                    return
                 is_serious = matches_command("advise")
                 command_start = f"{prefix} {'advise' if is_serious else 'advice'}"
                 
                 if len(command) > len(command_start):
                     advice_question = command[len(command_start):].strip()
                     if advice_question:
-                        await self.handle_advice_request(room.room_id, advice_question, is_edit, is_serious)
+                        await self.ai_processor.handle_advice_request(room.room_id, advice_question, is_edit, is_serious, send_message_func=self.send_message)
                     else:
                         command_type = "advise" if is_serious else "advice"
                         error_msg = f"{edit_prefix}Please provide a question for advice. Usage: {self.current_display_name}: {command_type} <your question>"
@@ -1084,362 +1111,7 @@ class DebugMatrixBot:
 
 
 
-    async def get_nist_beacon_random_number(self):
-        """Get current NIST Randomness Beacon value and return as integer"""
-        try:
-            if not AIOHTTP_AVAILABLE:
-                print("Warning: aiohttp not available for NIST beacon, using fallback")
-                import time
-                return int(time.time())
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://beacon.nist.gov/beacon/2.0/pulse/last",
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as response:
-
-                    if response.status == 200:
-                        data = await response.json()
-                        output_value = data['pulse']['outputValue']
-                        print(f"NIST Beacon value: {output_value[:16]}...")
-                        beacon_int = int(output_value, 16)
-                        print(f"NIST Beacon integer: {beacon_int}")
-                        return beacon_int
-                    else:
-                        print(f"NIST Beacon API error {response.status}, using fallback")
-                        import time
-                        return int(time.time())
-
-        except Exception as e:
-            print(f"Error getting NIST beacon value: {e}, using fallback")
-            import time
-            return int(time.time())
-
-    async def get_nist_beacon_value(self):
-        """Get current NIST Randomness Beacon value and determine positive/negative"""
-        beacon_int = await self.get_nist_beacon_random_number()
-        is_positive = (beacon_int % 2) == 0
-        print(f"NIST Beacon determines: {'POSITIVE' if is_positive else 'NEGATIVE'}")
-        return is_positive
-
-    async def handle_magic_8ball(self, room_id, question=None, is_edit=False):
-        """Generate a magic 8-ball style fortune using NIST Beacon + AI"""
-        if not AIOHTTP_AVAILABLE:
-            await self.send_message(room_id, "❌ Magic 8-ball requires aiohttp. Install with: pip install aiohttp")
-            return
-
-        if not os.getenv("OPENROUTER_API_KEY"):
-            await self.send_message(room_id, "❌ Magic 8-ball requires OPENROUTER_API_KEY in .env file")
-            return
-
-        try:
-            edit_prefix = "✏️ " if is_edit else ""
-            if question:
-                await self.send_message(room_id, f"{edit_prefix}🎱 *Consulting the NIST quantum oracle for: '{question}'...*")
-            else:
-                await self.send_message(room_id, f"{edit_prefix}🎱 *Consulting the NIST quantum oracle...*")
-
-            is_positive = await self.get_nist_beacon_value()
-            fortune = await self.generate_ai_fortune(question, is_positive)
-
-            if fortune:
-                beacon_info = "✨ *Determined by NIST Randomness Beacon quantum entropy*"
-                if is_edit:
-                    beacon_info += " (responding to edit)"
-                await self.send_message(room_id, f"{edit_prefix}🎱 {fortune}\n\n{beacon_info}")
-            else:
-                await self.send_message(room_id, f"{edit_prefix}🎱 The quantum spirits are unclear... try again later.")
-
-        except Exception as e:
-            print(f"Error in magic 8-ball: {e}")
-            await self.send_message(room_id, f"{edit_prefix}🎱 The magic 8-ball is broken! Try again later.")
-
-    async def handle_bible_verse(self, room_id, is_edit=False):
-        """Get a random Bible verse using NIST Beacon"""
-        try:
-            edit_prefix = "✏️ " if is_edit else ""
-            await self.send_message(room_id, f"{edit_prefix}📖 *Consulting the NIST quantum scripture selector...*")
-
-            bible_file = "kjv.txt"
-            if not os.path.exists(bible_file):
-                await self.send_message(room_id, f"{edit_prefix}❌ Bible file (kjv.txt) not found. Please download it from https://openbible.com/textfiles/kjv.txt")
-                return
-
-            verses = await self.parse_bible_file(bible_file)
-            if not verses:
-                await self.send_message(room_id, f"{edit_prefix}❌ Could not parse Bible file. Please check the format.")
-                return
-
-            beacon_number = await self.get_nist_beacon_random_number()
-            verse_index = beacon_number % len(verses)
-            selected_verse = verses[verse_index]
-
-            print(f"Selected verse {verse_index + 1} of {len(verses)} using NIST beacon")
-
-            beacon_info = "✨ *Verse selected by NIST Randomness Beacon quantum entropy*"
-            if is_edit:
-                beacon_info += " (responding to edit)"
-
-            response = f"{edit_prefix}📖 **{selected_verse['reference']}**\n\n*{selected_verse['text']}*\n\n{beacon_info}"
-            await self.send_message(room_id, response)
-
-        except Exception as e:
-            print(f"Error in Bible verse selection: {e}")
-            await self.send_message(room_id, f"{edit_prefix}📖 The quantum scripture selector encountered an error. Perhaps this is a sign to reflect quietly.")
-
-    async def handle_bible_song(self, room_id, is_edit=False):
-        """Get a random Bible verse and find a thematically related song"""
-        if not AIOHTTP_AVAILABLE:
-            await self.send_message(room_id, "❌ Bible song feature requires aiohttp. Install with: pip install aiohttp")
-            return
-
-        if not os.getenv("OPENROUTER_API_KEY"):
-            await self.send_message(room_id, "❌ Bible song feature requires OPENROUTER_API_KEY in .env file")
-            return
-
-        try:
-            edit_prefix = "✏️ " if is_edit else ""
-            await self.send_message(room_id, f"{edit_prefix}🎵 *Consulting the NIST quantum scripture & music archives...*")
-
-            bible_file = "kjv.txt"
-            if not os.path.exists(bible_file):
-                await self.send_message(room_id, f"{edit_prefix}❌ Bible file (kjv.txt) not found. Please download it from https://openbible.com/textfiles/kjv.txt")
-                return
-
-            verses = await self.parse_bible_file(bible_file)
-            if not verses:
-                await self.send_message(room_id, f"{edit_prefix}❌ Could not parse Bible file. Please check the format.")
-                return
-
-            beacon_number = await self.get_nist_beacon_random_number()
-            verse_index = beacon_number % len(verses)
-            selected_verse = verses[verse_index]
-
-            print(f"Selected verse {verse_index + 1} of {len(verses)} using NIST beacon for song pairing")
-
-            song_recommendation = await self.find_thematic_song(selected_verse['text'])
-
-            if song_recommendation:
-                beacon_info = "✨ *Verse & song pairing selected by NIST Randomness Beacon quantum entropy*"
-                if is_edit:
-                    beacon_info += " (responding to edit)"
-
-                response = f"""{edit_prefix}📖 **{selected_verse['reference']}**
-*{selected_verse['text']}*
-
-🎵 **Thematically Related Song:**
-{song_recommendation}
-
-{beacon_info}"""
-                await self.send_message(room_id, response)
-            else:
-                response = f"""{edit_prefix}📖 **{selected_verse['reference']}**
-*{selected_verse['text']}*
-
-🎵 *Could not find a thematic song match - perhaps silence is the perfect accompaniment.*
-
-✨ *Verse selected by NIST Randomness Beacon quantum entropy*"""
-                await self.send_message(room_id, response)
-
-        except Exception as e:
-            print(f"Error in Bible song selection: {e}")
-            await self.send_message(room_id, f"{edit_prefix}🎵 The quantum scripture & music selector encountered an error. Perhaps this calls for quiet contemplation.")
-
-    async def handle_advice_request(self, room_id, question, is_edit=False, is_serious=True):
-        """Generate advice using NIST Beacon + AI (serious or funny)"""
-        if not AIOHTTP_AVAILABLE:
-            await self.send_message(room_id, "❌ Advice feature requires aiohttp. Install with: pip install aiohttp")
-            return
-
-        if not os.getenv("OPENROUTER_API_KEY"):
-            await self.send_message(room_id, "❌ Advice feature requires OPENROUTER_API_KEY in .env file")
-            return
-
-        try:
-            edit_prefix = "✏️ " if is_edit else ""
-            advice_type = "thoughtful wisdom" if is_serious else "unconventional wisdom"
-            await self.send_message(room_id, f"{edit_prefix}🤔 *Consulting the NIST quantum {advice_type} archives...*")
-
-            is_positive = await self.get_nist_beacon_value()
-
-            if is_serious:
-                advice = await self.generate_considerate_advice(question, is_positive)
-                advice_label = "**Quantum-Guided Thoughtful Advice:**"
-            else:
-                advice = await self.generate_funny_advice(question, is_positive)
-                advice_label = "**Quantum-Guided Unconventional Advice:**"
-
-            if advice:
-                beacon_info = "🌌 *Advice polarity determined by NIST quantum randomness*"
-                if is_edit:
-                    beacon_info += " (responding to edit)"
-                await self.send_message(room_id, f"{edit_prefix}💡 {advice_label}\n{advice}\n\n{beacon_info}")
-            else:
-                fallback = "try consulting a wise friend instead!" if is_serious else "try asking a rubber duck instead!"
-                await self.send_message(room_id, f"{edit_prefix}🤷 The quantum wisdom generators are offline... {fallback}")
-
-        except Exception as e:
-            print(f"Error generating advice: {e}")
-            if is_serious:
-                await self.send_message(room_id, f"{edit_prefix}💥 The thoughtful advice system encountered an error. Perhaps that's advice in itself - sometimes we need to pause and reflect.")
-            else:
-                await self.send_message(room_id, f"{edit_prefix}💥 The quantum advice machine exploded! This is probably good advice in itself.")
-
-    async def parse_bible_file(self, file_path):
-        """Parse the KJV Bible text file and return list of verses"""
-        try:
-            verses = []
-
-            with open(file_path, 'r', encoding='utf-8') as file:
-                for line in file:
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                    if '\t' in line:
-                        parts = line.split('\t', 1)
-                        if len(parts) == 2:
-                            reference = parts[0].strip()
-                            text = parts[1].strip()
-
-                            if reference and text:
-                                verses.append({
-                                    'reference': reference,
-                                    'text': text
-                                })
-
-            print(f"Loaded {len(verses)} Bible verses from {file_path}")
-            return verses
-
-        except Exception as e:
-            print(f"Error parsing Bible file: {e}")
-            return []
-
-
-    async def find_thematic_song(self, bible_text):
-        """Find a song that shares thematic elements with the Bible verse"""
-        try:
-            openrouter_key = os.getenv("OPENROUTER_API_KEY")
-            if not openrouter_key: return None
-
-            prompt = f"""Return only a song title and creator that shares thematic elements, imagery, or emotional resonance with the text: {bible_text}
-Format your response EXACTLY as: "Song Title" by Artist Name
-Do NOT include any YouTube links or URLs. Just the song title and artist."""
-
-            payload = {"model": "cognitivecomputations/dolphin3.0-mistral-24b:free", "messages": [{"role": "user", "content": prompt}], "max_tokens": 100, "temperature": 0.8, "top_p": 0.9}
-            headers = {"Authorization": f"Bearer {openrouter_key}", "Content-Type": "application/json", "HTTP-Referer": "https://github.com/matrix-nio/matrix-nio", "X-Title": "Matrix Bot"}
-
-            async with aiohttp.ClientSession() as session:
-                async with session.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        song_rec = data['choices'][0]['message']['content'].strip().strip('"').strip("'").strip()
-                        youtube_url = create_Youtube_url(song_rec)
-                        return f"{song_rec}\nYoutube: {youtube_url}"
-                    else:
-                        print(f"OpenRouter API error {response.status}")
-                        return None
-
-        except Exception as e:
-            print(f"Error finding thematic song: {e}")
-            return None
-
-    async def generate_ai_fortune(self, question=None, is_positive=True):
-        """Generate a creative fortune using AI with NIST-determined polarity"""
-        try:
-            openrouter_key = os.getenv("OPENROUTER_API_KEY")
-            if not openrouter_key: return None
-
-            polarity = "POSITIVE/YES" if is_positive else "NEGATIVE/NO"
-
-            if question:
-                prompt = f"""You are a bold, decisive magic 8-ball oracle powered by NIST quantum randomness. Someone asks: "{question}"
-The NIST Randomness Beacon has determined this answer should be {polarity}.
-Give a CLEAR {polarity.lower()} answer with mystical flair:
-{"POSITIVE/YES examples:" if is_positive else "NEGATIVE/NO examples:"}
-{'''"The cosmic winds STRONGLY favor this venture - quantum forces align!"''' if is_positive else '''"The quantum realm SCREAMS warning - avoid this path!"'''}
-Be mystical, dramatic, and CLEARLY {polarity.lower()}! Reference quantum/cosmic forces. 1-2 sentences max."""
-            else:
-                prompt = f"""You are a dramatic magic 8-ball oracle powered by NIST quantum randomness.
-The quantum realm has determined this fortune should be {polarity}.
-Give a {polarity.lower()} mystical fortune with cosmic flair:
-{"POSITIVE examples:" if is_positive else "NEGATIVE examples:"}
-{'''"Quantum entanglement brings tremendous fortune to your timeline!"''' if is_positive else '''"Dark quantum fluctuations gather around your path!"'''}
-Reference quantum/cosmic forces and be CLEARLY {polarity.lower()}! 1-2 sentences max."""
-
-            payload = {"model": "cognitivecomputations/dolphin3.0-mistral-24b:free", "messages": [{"role": "user", "content": prompt}], "max_tokens": 150, "temperature": 1.1, "top_p": 0.9}
-            headers = {"Authorization": f"Bearer {openrouter_key}", "Content-Type": "application/json", "HTTP-Referer": "https://github.com/matrix-nio/matrix-nio", "X-Title": "Matrix Bot"}
-
-            async with aiohttp.ClientSession() as session:
-                async with session.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data['choices'][0]['message']['content'].strip().strip('"').strip("'").strip()
-                    else:
-                        print(f"OpenRouter API error {response.status}")
-                        return None
-
-        except Exception as e:
-            print(f"Error generating AI fortune: {e}")
-            return None
-
-    async def generate_considerate_advice(self, question, is_positive=True):
-        """Generate thoughtful, serious advice using AI with NIST-determined polarity"""
-        try:
-            openrouter_key = os.getenv("OPENROUTER_API_KEY")
-            if not openrouter_key: return None
-
-            polarity_instruction = "ENCOURAGING and OPTIMISTIC" if is_positive else "CAUTIONARY and REALISTIC"
-
-            prompt = f"""Someone asked for thoughtful advice: "{question}"
-The NIST Randomness Beacon has determined this should be {polarity_instruction} advice.
-Give SERIOUS, CONSIDERATE advice that's: {polarity_instruction} in tone, thoughtful and empathetic, practical and actionable, wise and mature, 2-3 sentences.
-Be genuinely helpful, empathetic, and maintain the {polarity_instruction.lower()} tone."""
-
-            payload = {"model": "cognitivecomputations/dolphin3.0-mistral-24b:free", "messages": [{"role": "user", "content": prompt}], "max_tokens": 200, "temperature": 0.7, "top_p": 0.9}
-            headers = {"Authorization": f"Bearer {openrouter_key}", "Content-Type": "application/json", "HTTP-Referer": "https://github.com/matrix-nio/matrix-nio", "X-Title": "Matrix Bot"}
-
-            async with aiohttp.ClientSession() as session:
-                async with session.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data['choices'][0]['message']['content'].strip().strip('"').strip("'").strip()
-                    else:
-                        print(f"OpenRouter API error {response.status}")
-                        return None
-
-        except Exception as e:
-            print(f"Error generating considerate advice: {e}")
-            return None
-
-    async def generate_funny_advice(self, question, is_positive=True):
-        """Generate funny, unconventional advice using AI with NIST-determined polarity"""
-        try:
-            openrouter_key = os.getenv("OPENROUTER_API_KEY")
-            if not openrouter_key: return None
-
-            polarity_instruction = "POSITIVE and ENCOURAGING" if is_positive else "CAUTIONARY and SKEPTICAL"
-
-            prompt = f"""Someone asked for advice: "{question}"
-The NIST Randomness Beacon has determined this should be {polarity_instruction} advice.
-Give FUNNY, UNCONVENTIONAL advice that's: {polarity_instruction} in tone, hilariously absurd but somehow makes weird sense, creative and unexpected. 2-3 sentences max.
-Be creative, weird, and funny while maintaining the {polarity_instruction.lower()} tone determined by quantum randomness!"""
-
-            payload = {"model": "cognitivecomputations/dolphin3.0-mistral-24b:free", "messages": [{"role": "user", "content": prompt}], "max_tokens": 200, "temperature": 1.2, "top_p": 0.95}
-            headers = {"Authorization": f"Bearer {openrouter_key}", "Content-Type": "application/json", "HTTP-Referer": "https://github.com/matrix-nio/matrix-nio", "X-Title": "Matrix Bot"}
-
-            async with aiohttp.ClientSession() as session:
-                async with session.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data['choices'][0]['message']['content'].strip().strip('"').strip("'").strip()
-                    else:
-                        print(f"OpenRouter API error {response.status}")
-                        return None
-
-        except Exception as e:
-            print(f"Error generating funny advice: {e}")
-            return None
 
     async def handle_db_health_check(self, room_id, is_edit=False):
         """Handle database health check command"""

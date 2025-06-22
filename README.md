@@ -86,7 +86,31 @@ docker-compose -f boo_bot/docker-compose.yml build --no-cache
 
 ### Running Tests
 
-To run the complete test suite in the Docker container:
+The project includes a dedicated test service in docker-compose for easy test execution. You can run tests using either the new test service or the traditional exec approach.
+
+#### Using the Test Service (Recommended)
+
+```bash
+# Run all tests using the dedicated test service
+docker-compose --profile test up boo_bot_tests
+
+# Run tests as a one-off command (preferred for CI/CD)
+docker-compose run --rm boo_bot_tests
+
+# Run tests with custom pytest options
+docker-compose run --rm boo_bot_tests python -m pytest tests/ -v --tb=short
+
+# Run specific test files
+docker-compose run --rm boo_bot_tests python -m pytest tests/test_api_client.py -v
+docker-compose run --rm boo_bot_tests python -m pytest tests/test_boo_bot.py -v
+
+# Run tests with coverage
+docker-compose run --rm boo_bot_tests python -m pytest tests/ --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v
+```
+
+#### Using Exec Commands (Alternative)
+
+If you have the main bot service running, you can also execute tests directly:
 
 ```bash
 # Run all tests with verbose output
@@ -148,16 +172,27 @@ Current test coverage as of the latest run:
 After running tests with coverage in Docker, you can extract the HTML report:
 
 ```bash
-# Run tests with coverage
-docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v
+# Run tests with coverage using the test service
+docker-compose run --rm boo_bot_tests python -m pytest tests/ --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v
 
-# Copy coverage report from container to host
-docker cp $(docker-compose -f boo_bot/docker-compose.yml ps -q boo_bot):/app/htmlcov ./boo_bot/coverage/
+# Copy coverage report from the test container to host
+# Note: Since the test service runs and exits, you'll need to run a temporary container to copy files
+docker-compose run --rm -v $(pwd)/boo_bot/coverage:/app/coverage_output boo_bot_tests sh -c "python -m pytest tests/ --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v && cp -r htmlcov /app/coverage_output/"
 
 # Open the coverage report in your browser
 open boo_bot/coverage/htmlcov/index.html  # On macOS
 xdg-open boo_bot/coverage/htmlcov/index.html  # On Linux
 start boo_bot/coverage/htmlcov/index.html  # On Windows
+```
+
+Alternatively, using the exec approach if the main service is running:
+
+```bash
+# Run tests with coverage using exec
+docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v
+
+# Copy coverage report from container to host
+docker cp $(docker-compose -f boo_bot/docker-compose.yml ps -q boo_bot):/app/htmlcov ./boo_bot/coverage/
 ```
 
 The HTML report provides:

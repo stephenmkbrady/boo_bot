@@ -37,6 +37,7 @@ COPY kjv.txt .
 COPY tests/ tests/
 COPY youtube_handler.py .
 COPY ai_handler.py .
+COPY media_handler.py .
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store && \

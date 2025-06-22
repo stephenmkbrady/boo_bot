@@ -67,25 +67,65 @@ The API will be accessible at `http://localhost:8000`.
 
 ## Testing
 
-The project includes comprehensive test suites for both main modules.
+The project includes comprehensive test suites for both main modules and runs in a Docker container environment.
+
+### Prerequisites for Testing
+
+- Docker and Docker Compose installed
+- The boo_bot Docker container built and running
+
+### Building the Docker Container
+
+```bash
+# Build the Docker container (includes test dependencies)
+docker-compose -f boo_bot/docker-compose.yml build
+
+# Or rebuild without cache if needed
+docker-compose -f boo_bot/docker-compose.yml build --no-cache
+```
 
 ### Running Tests
 
-To run the test suite:
+To run the complete test suite in the Docker container:
 
 ```bash
-# Activate virtual environment
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+# Run all tests with verbose output
+docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests -v
 
-# Install test dependencies (if not already installed)
-pip install pytest pytest-asyncio pytest-cov
-
-# Run tests
-PYTHONPATH=. ../venv/bin/pytest tests/
+# Run specific test files
+docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests/test_api_client.py -v
+docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests/test_boo_bot.py -v
 
 # Run tests with coverage
-PYTHONPATH=. ../venv/bin/pytest --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing tests/
+docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v
 ```
+
+### Test Results
+
+As of the latest run, all tests are passing:
+- **37 tests total: 37 passed, 0 failed**
+- **21 tests** for API client functionality (`test_api_client.py`)
+- **16 tests** for bot functionality (`test_boo_bot.py`)
+
+### Troubleshooting Tests
+
+If tests fail due to Docker caching issues:
+
+1. **Rebuild without cache:**
+   ```bash
+   docker-compose -f boo_bot/docker-compose.yml build --no-cache
+   ```
+
+2. **Copy updated test files manually (if needed):**
+   ```bash
+   # Copy test file to running container
+   docker cp boo_bot/tests/test_boo_bot.py $(docker-compose -f boo_bot/docker-compose.yml ps -q boo_bot):/app/tests/test_boo_bot.py
+   ```
+
+3. **Verify test file contents in container:**
+   ```bash
+   docker-compose -f boo_bot/docker-compose.yml exec boo_bot cat /app/tests/test_boo_bot.py | grep -n "boo.*debug"
+   ```
 
 ### Test Coverage
 
@@ -105,9 +145,15 @@ Current test coverage as of the latest run:
 
 #### Viewing Detailed Coverage
 
-After running tests with coverage, open the HTML report:
+After running tests with coverage in Docker, you can extract the HTML report:
 
 ```bash
+# Run tests with coverage
+docker-compose -f boo_bot/docker-compose.yml exec -e PYTHONPATH=/app boo_bot pytest /app/tests --cov=boo_bot --cov=api_client --cov-report=html --cov-report=term-missing -v
+
+# Copy coverage report from container to host
+docker cp $(docker-compose -f boo_bot/docker-compose.yml ps -q boo_bot):/app/htmlcov ./boo_bot/coverage/
+
 # Open the coverage report in your browser
 open boo_bot/coverage/htmlcov/index.html  # On macOS
 xdg-open boo_bot/coverage/htmlcov/index.html  # On Linux

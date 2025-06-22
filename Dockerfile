@@ -34,9 +34,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY boo_bot.py .
 COPY api_client.py .
 COPY kjv.txt .
+COPY tests/ tests/
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store && \
     chmod 777 bot_store temp_media test_store
 
+# Default command runs the bot
 CMD ["python", "-u", "boo_bot.py"]
+
+# Alternative command to run tests
+# docker-compose run --rm boo_bot pytest tests/

@@ -39,6 +39,11 @@ COPY youtube_handler.py .
 COPY ai_handler.py .
 COPY media_handler.py .
 COPY config.py .
+COPY plugin_base.py .
+COPY plugin_manager.py .
+COPY youtube_plugin.py .
+COPY ai_plugin.py .
+COPY core_plugin.py .
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store && \

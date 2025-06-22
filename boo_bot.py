@@ -112,6 +112,18 @@ except ImportError as e:
     CONFIG_AVAILABLE = False
 
 try:
+    from plugin_manager import PluginManager
+    from youtube_plugin import YouTubePlugin
+    from ai_plugin import AIPlugin
+    from core_plugin import CorePlugin
+    print("✅ plugin system imported successfully")
+    PLUGIN_SYSTEM_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Warning: Could not import plugin system: {e}")
+    print("Plugin system will be disabled.")
+    PLUGIN_SYSTEM_AVAILABLE = False
+
+try:
     import aiohttp
     import aiofiles
     AIOHTTP_AVAILABLE = True
@@ -215,6 +227,13 @@ class DebugMatrixBot:
         else:
             print("⚠️ Media handler disabled")
 
+        # Initialize plugin system
+        self.plugin_manager = None
+        if PLUGIN_SYSTEM_AVAILABLE:
+            self._setup_plugins()
+        else:
+            print("⚠️ Plugin system disabled")
+
         # Dynamic bot name handling
         self.current_display_name = None  # No fallback
         self.last_name_check = None  # Track when we last checked the name
@@ -290,6 +309,34 @@ class DebugMatrixBot:
         except Exception as e:
             print(f"❌ Error initializing database client: {e}")
             self.db_enabled = False
+
+    def _setup_plugins(self):
+        """Set up plugins based on configuration"""
+        try:
+            self.plugin_manager = PluginManager()
+            
+            # Add core plugin (always enabled)
+            core_plugin = CorePlugin(bot_instance=self)
+            self.plugin_manager.add_plugin(core_plugin)
+            print("✅ Core plugin added")
+            
+            # Add YouTube plugin if enabled
+            if self.youtube_processor:
+                youtube_plugin = YouTubePlugin()
+                self.plugin_manager.add_plugin(youtube_plugin)
+                print("✅ YouTube plugin added")
+            
+            # Add AI plugin if enabled
+            if self.ai_processor:
+                ai_plugin = AIPlugin()
+                self.plugin_manager.add_plugin(ai_plugin)
+                print("✅ AI plugin added")
+                
+            print(f"✅ Plugin system initialized with {len(self.plugin_manager.plugins)} plugins")
+            
+        except Exception as e:
+            print(f"❌ Error setting up plugins: {e}")
+            self.plugin_manager = None
 
     async def debug_all_events_callback(self, room: MatrixRoom, event: Event):
         """Catch and log ALL events for debugging purposes"""
@@ -604,6 +651,24 @@ class DebugMatrixBot:
                 expected = f"{prefix} {pattern}".strip()
                 return command_lower == expected
 
+            # Try plugin system first
+            if self.plugin_manager:
+                # Extract command and args from the command text
+                command_parts = command_lower.replace(prefix, "").strip().split(" ", 1)
+                if command_parts:
+                    base_command = command_parts[0]
+                    args = command_parts[1] if len(command_parts) > 1 else ""
+                    
+                    # Try to handle with plugin system
+                    response = await self.plugin_manager.handle_command(
+                        base_command, args, room.room_id, event.sender
+                    )
+                    
+                    if response:
+                        await self.send_message(room.room_id, f"{edit_prefix}{response}")
+                        return
+
+            # Fallback to existing command handling for commands not handled by plugins
             if matches_exact("debug"):
                 debug_info = f"""{edit_prefix}🔍 **SIMPLIFIED DEBUG INFO**
 

@@ -137,7 +137,7 @@ async def test_handle_bot_command_debug(bot_instance, mock_nio_asyncclient):
     mock_nio_asyncclient.room_send.assert_called()
     args, kwargs = mock_nio_asyncclient.room_send.call_args
     assert kwargs['room_id'] == "!test:matrix.org"
-    assert "SIMPLIFIED DEBUG INFO" in kwargs['content']['body']
+    assert "DEBUG INFO" in kwargs['content']['body']
 
 @pytest.mark.asyncio
 async def test_handle_bot_command_talk(bot_instance, mock_nio_asyncclient):
@@ -153,7 +153,7 @@ async def test_handle_bot_command_talk(bot_instance, mock_nio_asyncclient):
     mock_nio_asyncclient.room_send.assert_called_once_with(
         room_id="!test:matrix.org",
         message_type="m.room.message",
-        content={"msgtype": "m.text", "body": "Hello! I'm boo - the simplified bot with proper encrypted media decryption!"},
+        content={"msgtype": "m.text", "body": "Hello! 👋 I'm your friendly Matrix bot. How can I help you today?"},
         ignore_unverified_devices=True
     )
 

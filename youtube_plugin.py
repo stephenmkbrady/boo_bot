@@ -9,8 +9,9 @@ except ImportError:
 
 
 class YouTubePlugin(BotPlugin):
-    def __init__(self, openrouter_key: str = None):
+    def __init__(self, openrouter_key: str = None, bot_instance=None):
         super().__init__("youtube")
+        self.bot = bot_instance
         if YOUTUBE_HANDLER_AVAILABLE:
             self.handler = YouTubeProcessor()
         else:
@@ -32,6 +33,10 @@ class YouTubePlugin(BotPlugin):
                 if not args:
                     return "❌ Please provide a YouTube URL. Usage: summary <youtube_url>"
                 
+                # Send immediate feedback
+                if self.bot:
+                    await self.bot.send_message(room_id, "🎬 Processing YouTube summary... This may take a moment.")
+                
                 response_container = []
                 async def capture_response(room_id, message):
                     response_container.append(message)
@@ -43,6 +48,10 @@ class YouTubePlugin(BotPlugin):
             elif command == "subs":
                 if not args:
                     return "❌ Please provide a YouTube URL. Usage: subs <youtube_url>"
+                
+                # Send immediate feedback
+                if self.bot:
+                    await self.bot.send_message(room_id, "📝 Downloading and processing subtitles... This may take a moment.")
                 
                 response_container = []
                 async def capture_response(room_id, message):

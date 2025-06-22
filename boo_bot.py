@@ -324,7 +324,7 @@ class DebugMatrixBot:
             
             # Add YouTube plugin if enabled in config
             if self.config and self.config.is_plugin_enabled("youtube") and YOUTUBE_HANDLER_AVAILABLE:
-                youtube_plugin = YouTubePlugin()
+                youtube_plugin = YouTubePlugin(bot_instance=self)
                 self.plugin_manager.add_plugin(youtube_plugin)
                 print("✅ YouTube plugin added")
             

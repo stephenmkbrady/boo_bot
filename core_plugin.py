@@ -1,4 +1,5 @@
 from typing import List, Optional
+import logging
 from plugin_base import BotPlugin
 
 
@@ -6,12 +7,16 @@ class CorePlugin(BotPlugin):
     def __init__(self, bot_instance=None):
         super().__init__("core")
         self.bot = bot_instance
+        self.logger = logging.getLogger(f"plugin.{self.name}")
     
     def get_commands(self) -> List[str]:
         return ["debug", "talk", "help", "ping", "room", "refresh", "update", "name"]
     
     async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+        self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
+        
         if not self.bot:
+            self.logger.error("Bot instance not available")
             return "❌ Bot instance not available"
         
         try:
@@ -30,7 +35,8 @@ class CorePlugin(BotPlugin):
             elif command == "name" and args in ["refresh", "update"]:
                 return await self._handle_refresh_name_command()
         except Exception as e:
-            return f"❌ Error processing {command} command: {str(e)}"
+            self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)
+            return f"❌ Error processing {command} command"
         
         return None
     

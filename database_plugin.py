@@ -1,4 +1,5 @@
 from typing import List, Optional
+import logging
 from plugin_base import BotPlugin
 
 
@@ -6,6 +7,7 @@ class DatabasePlugin(BotPlugin):
     def __init__(self, bot_instance=None):
         super().__init__("database")
         self.bot = bot_instance
+        self.logger = logging.getLogger(f"plugin.{self.name}")
         # Only enable if database is available
         self.enabled = bot_instance and getattr(bot_instance, 'db_enabled', False)
     
@@ -13,7 +15,10 @@ class DatabasePlugin(BotPlugin):
         return ["db"]
     
     async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+        self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
+        
         if not self.bot or not self.enabled:
+            self.logger.error("Database functionality not available")
             return "❌ Database functionality not available"
         
         try:
@@ -25,7 +30,8 @@ class DatabasePlugin(BotPlugin):
                 else:
                     return "❌ Unknown database command. Use 'db health' or 'db stats'"
         except Exception as e:
-            return f"❌ Error processing database command: {str(e)}"
+            self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)
+            return f"❌ Error processing database command"
         
         return None
     

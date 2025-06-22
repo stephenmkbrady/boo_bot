@@ -112,6 +112,15 @@ except ImportError as e:
     CONFIG_AVAILABLE = False
 
 try:
+    from logging_setup import setup_logging
+    print("✅ logging setup imported successfully")
+    LOGGING_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Warning: Could not import logging setup: {e}")
+    print("Advanced logging will be disabled.")
+    LOGGING_AVAILABLE = False
+
+try:
     from plugin_manager import PluginManager
     from youtube_plugin import YouTubePlugin
     from ai_plugin import AIPlugin
@@ -157,12 +166,25 @@ class DebugMatrixBot:
         print(f"   User ID: {user_id}")
         print(f"   Device: {device_name}")
 
+        # Initialize logging system
+        if LOGGING_AVAILABLE:
+            self.logger = setup_logging(level="INFO", log_file="bot.log")
+            self.logger.info("Bot starting up - logging system initialized")
+            print(f"✅ Logging system initialized")
+        else:
+            self.logger = None
+            print(f"⚠️ Logging system disabled")
+
         # Initialize configuration system
         if CONFIG_AVAILABLE:
             self.config = BotConfig()
+            if self.logger:
+                self.logger.info("Configuration system initialized")
             print(f"✅ Configuration system initialized")
         else:
             self.config = None
+            if self.logger:
+                self.logger.warning("Configuration system disabled")
             print(f"⚠️ Configuration system disabled")
 
         self.homeserver = homeserver

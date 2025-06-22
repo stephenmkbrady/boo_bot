@@ -40,6 +40,7 @@ COPY youtube_handler.py .
 COPY ai_handler.py .
 COPY media_handler.py .
 COPY config.py .
+COPY logging_setup.py .
 COPY plugin_base.py .
 COPY plugin_manager.py .
 COPY youtube_plugin.py .
@@ -48,8 +49,8 @@ COPY core_plugin.py .
 COPY database_plugin.py .
 
 # Create directories
-RUN mkdir -p bot_store temp_media test_store && \
-    chmod 777 bot_store temp_media test_store
+RUN mkdir -p bot_store temp_media test_store logs && \
+    chmod 777 bot_store temp_media test_store logs
 
 # Default command runs the bot
 CMD ["python", "-u", "boo_bot.py"]

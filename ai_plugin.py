@@ -1,4 +1,5 @@
 from typing import List, Optional
+import logging
 from plugin_base import BotPlugin
 
 try:
@@ -11,17 +12,24 @@ except ImportError:
 class AIPlugin(BotPlugin):
     def __init__(self, openrouter_key: str = None):
         super().__init__("ai")
+        self.logger = logging.getLogger(f"plugin.{self.name}")
+        
         if AI_HANDLER_AVAILABLE:
             self.handler = AIProcessor()
+            self.logger.info("AI plugin initialized successfully")
         else:
             self.handler = None
             self.enabled = False
+            self.logger.warning("AI plugin disabled - AIProcessor not available")
     
     def get_commands(self) -> List[str]:
         return ["8ball", "advice", "advise", "bible", "song", "nist"]
     
     async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+        self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
+        
         if not self.handler:
+            self.logger.error("AI handler not available")
             return "❌ AI functionality not available"
         
         try:
@@ -72,6 +80,7 @@ class AIPlugin(BotPlugin):
                 return "\n".join(response_container) if response_container else "❌ No Bible verse available"
                 
         except Exception as e:
-            return f"❌ Error processing {command} command: {str(e)}"
+            self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)
+            return f"❌ Error processing {command} command"
         
         return None

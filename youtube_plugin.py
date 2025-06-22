@@ -1,4 +1,5 @@
 from typing import List, Optional
+import logging
 from plugin_base import BotPlugin
 
 try:
@@ -12,17 +13,24 @@ class YouTubePlugin(BotPlugin):
     def __init__(self, openrouter_key: str = None, bot_instance=None):
         super().__init__("youtube")
         self.bot = bot_instance
+        self.logger = logging.getLogger(f"plugin.{self.name}")
+        
         if YOUTUBE_HANDLER_AVAILABLE:
             self.handler = YouTubeProcessor()
+            self.logger.info("YouTube plugin initialized successfully")
         else:
             self.handler = None
             self.enabled = False
+            self.logger.warning("YouTube plugin disabled - YouTubeProcessor not available")
     
     def get_commands(self) -> List[str]:
         return ["summary", "subs", "ask", "videos"]
     
     async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+        self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
+        
         if not self.handler:
+            self.logger.error("YouTube handler not available")
             return "❌ YouTube functionality not available"
         
         try:
@@ -31,7 +39,10 @@ class YouTubePlugin(BotPlugin):
             
             if command == "summary":
                 if not args:
+                    self.logger.warning(f"Summary command called without URL by {user_id}")
                     return "❌ Please provide a YouTube URL. Usage: summary <youtube_url>"
+                
+                self.logger.info(f"Processing YouTube summary for URL: {args[:100]}...")
                 
                 # Send immediate feedback
                 if self.bot:
@@ -42,12 +53,21 @@ class YouTubePlugin(BotPlugin):
                     response_container.append(message)
                 
                 await self.handler.handle_youtube_summary(room_id, args, False, capture_response)
-                # Return all messages joined together
-                return "\n".join(response_container) if response_container else "❌ No summary available"
+                result = "\n".join(response_container) if response_container else "❌ No summary available"
+                
+                if response_container:
+                    self.logger.info(f"YouTube summary completed successfully for {user_id}")
+                else:
+                    self.logger.warning(f"No summary generated for {user_id} with URL: {args[:100]}")
+                
+                return result
                 
             elif command == "subs":
                 if not args:
+                    self.logger.warning(f"Subs command called without URL by {user_id}")
                     return "❌ Please provide a YouTube URL. Usage: subs <youtube_url>"
+                
+                self.logger.info(f"Processing YouTube subtitles for URL: {args[:100]}...")
                 
                 # Send immediate feedback
                 if self.bot:
@@ -59,8 +79,14 @@ class YouTubePlugin(BotPlugin):
                 
                 # Note: subs may also send file attachments, but for now we'll just capture text responses
                 await self.handler.handle_youtube_subs(room_id, args, False, capture_response, None)
-                # Return all messages joined together
-                return "\n".join(response_container) if response_container else "❌ No subtitles available"
+                result = "\n".join(response_container) if response_container else "❌ No subtitles available"
+                
+                if response_container:
+                    self.logger.info(f"YouTube subtitles processed successfully for {user_id}")
+                else:
+                    self.logger.warning(f"No subtitles generated for {user_id} with URL: {args[:100]}")
+                
+                return result
                 
             elif command == "ask":
                 if not args:
@@ -84,6 +110,7 @@ class YouTubePlugin(BotPlugin):
                 return "\n".join(response_container) if response_container else "❌ No videos found"
                 
         except Exception as e:
-            return f"❌ Error processing {command} command: {str(e)}"
+            self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)
+            return f"❌ Error processing {command} command"
         
         return None

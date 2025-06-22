@@ -1,0 +1,28 @@
+youtube:
+  enabled: true
+  config:
+    max_cached_per_room: 5
+    chunk_size: 8000
+
+ai:
+  enabled: true
+  config:
+    model: "cognitivecomputations/dolphin3.0-mistral-24b:free"
+    temperature: 0.3
+    max_tokens: 500
+
+media:
+  enabled: true
+  config:
+    temp_dir: "./temp_media"
+    max_file_size: "50MB"
+
+database:
+  enabled: true
+  config:
+    timeout: 30
+
+core:
+  enabled: true
+  config:
+    debug_enabled: true

@@ -317,24 +317,25 @@ class DebugMatrixBot:
             self.plugin_manager = PluginManager()
             
             # Add core plugin (always enabled)
-            core_plugin = CorePlugin(bot_instance=self)
-            self.plugin_manager.add_plugin(core_plugin)
-            print("✅ Core plugin added")
+            if not self.config or self.config.is_plugin_enabled("core"):
+                core_plugin = CorePlugin(bot_instance=self)
+                self.plugin_manager.add_plugin(core_plugin)
+                print("✅ Core plugin added")
             
-            # Add YouTube plugin if enabled
-            if self.youtube_processor:
+            # Add YouTube plugin if enabled in config
+            if self.config and self.config.is_plugin_enabled("youtube") and YOUTUBE_HANDLER_AVAILABLE:
                 youtube_plugin = YouTubePlugin()
                 self.plugin_manager.add_plugin(youtube_plugin)
                 print("✅ YouTube plugin added")
             
-            # Add AI plugin if enabled
-            if self.ai_processor:
+            # Add AI plugin if enabled in config
+            if self.config and self.config.is_plugin_enabled("ai") and AI_HANDLER_AVAILABLE:
                 ai_plugin = AIPlugin()
                 self.plugin_manager.add_plugin(ai_plugin)
                 print("✅ AI plugin added")
             
-            # Add database plugin if enabled
-            if self.db_enabled:
+            # Add database plugin if enabled in config
+            if self.config and self.config.is_plugin_enabled("database") and DATABASE_CLIENT_AVAILABLE:
                 database_plugin = DatabasePlugin(bot_instance=self)
                 self.plugin_manager.add_plugin(database_plugin)
                 print("✅ Database plugin added")
@@ -343,6 +344,8 @@ class DebugMatrixBot:
             
         except Exception as e:
             print(f"❌ Error setting up plugins: {e}")
+            import traceback
+            traceback.print_exc()
             self.plugin_manager = None
 
     async def debug_all_events_callback(self, room: MatrixRoom, event: Event):

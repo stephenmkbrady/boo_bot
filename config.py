@@ -1,4 +1,6 @@
 import os
+import yaml
+from pathlib import Path
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
@@ -8,40 +10,71 @@ class FeatureConfig:
     config: Dict[str, Any]
 
 class BotConfig:
-    def __init__(self):
-        # Matrix config
-        self.homeserver = os.getenv("HOMESERVER", "https://matrix.org")
-        self.user_id = os.getenv("USER_ID")
-        self.password = os.getenv("PASSWORD")
-        self.room_id = os.getenv("ROOM_ID")
+    def __init__(self, env_file: str = ".env"):
+        self.env_file = env_file
+        self.load_env_file()
         
-        # Feature flags
-        self.features = {
-            "youtube": FeatureConfig(
-                enabled=bool(os.getenv("OPENROUTER_API_KEY")),
-                config={"max_cached_per_room": 5}
-            ),
-            "ai": FeatureConfig(
-                enabled=bool(os.getenv("OPENROUTER_API_KEY")),
-                config={"model": "meta-llama/llama-3.2-3b-instruct:free"}
-            ),
-            "media": FeatureConfig(
-                enabled=bool(os.getenv("DATABASE_API_KEY")),
-                config={"temp_dir": "./temp_media"}
-            ),
-            "database": FeatureConfig(
-                enabled=bool(os.getenv("DATABASE_API_KEY")),
-                config={}
-            )
-        }
+        # Load plugin configuration
+        self.plugin_config = self._load_plugin_config()
         
-        # API keys
-        self.openrouter_key = os.getenv("OPENROUTER_API_KEY")
-        self.database_api_key = os.getenv("DATABASE_API_KEY")
-        self.database_api_url = os.getenv("DATABASE_API_URL")
+    def load_env_file(self):
+        """Load environment variables from file"""
+        if Path(self.env_file).exists():
+            with open(self.env_file) as f:
+                for line in f:
+                    if '=' in line and not line.strip().startswith('#'):
+                        key, value = line.strip().split('=', 1)
+                        os.environ[key] = value
     
+    def _load_plugin_config(self) -> Dict[str, Any]:
+        """Load plugin configuration from YAML"""
+        config_file = Path("config/plugins.yaml")
+        if config_file.exists():
+            with open(config_file) as f:
+                return yaml.safe_load(f) or {}
+        return {}
+    
+    def is_plugin_enabled(self, plugin_name: str) -> bool:
+        """Check if plugin is enabled in config"""
+        plugin_config = self.plugin_config.get(plugin_name, {})
+        return plugin_config.get("enabled", False)
+    
+    def get_plugin_config(self, plugin_name: str) -> Dict[str, Any]:
+        """Get configuration for specific plugin"""
+        return self.plugin_config.get(plugin_name, {}).get("config", {})
+    
+    # Matrix config properties
+    @property
+    def homeserver(self):
+        return os.getenv("HOMESERVER", "https://matrix.org")
+    
+    @property
+    def user_id(self):
+        return os.getenv("USER_ID")
+    
+    @property
+    def password(self):
+        return os.getenv("PASSWORD")
+    
+    @property
+    def room_id(self):
+        return os.getenv("ROOM_ID")
+    
+    @property
+    def openrouter_key(self):
+        return os.getenv("OPENROUTER_API_KEY")
+    
+    @property
+    def database_api_key(self):
+        return os.getenv("DATABASE_API_KEY")
+    
+    @property
+    def database_api_url(self):
+        return os.getenv("DATABASE_API_URL")
+    
+    # Legacy methods for backward compatibility
     def is_feature_enabled(self, feature_name: str) -> bool:
-        return self.features.get(feature_name, FeatureConfig(False, {})).enabled
+        return self.is_plugin_enabled(feature_name)
     
     def get_feature_config(self, feature_name: str) -> Dict[str, Any]:
-        return self.features.get(feature_name, FeatureConfig(False, {})).config
+        return self.get_plugin_config(feature_name)

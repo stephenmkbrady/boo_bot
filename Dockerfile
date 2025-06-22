@@ -35,6 +35,7 @@ COPY boo_bot.py .
 COPY api_client.py .
 COPY kjv.txt .
 COPY tests/ tests/
+COPY config/ config/
 COPY youtube_handler.py .
 COPY ai_handler.py .
 COPY media_handler.py .

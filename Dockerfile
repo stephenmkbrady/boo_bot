@@ -38,6 +38,7 @@ COPY tests/ tests/
 COPY youtube_handler.py .
 COPY ai_handler.py .
 COPY media_handler.py .
+COPY config.py .
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store && \

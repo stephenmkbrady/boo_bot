@@ -178,23 +178,42 @@ class DebugMatrixBot:
             'decryption_failures': 0
         }
 
-        # YouTube functionality
-        if YOUTUBE_HANDLER_AVAILABLE:
+        # Initialize handlers based on configuration
+        self.youtube_processor = None
+        self.ai_processor = None
+        self.media_processor = None
+        
+        if self.config and self.config.is_feature_enabled("youtube") and YOUTUBE_HANDLER_AVAILABLE:
             self.youtube_processor = YouTubeProcessor()
+            print("✅ YouTube handler enabled via configuration")
+        elif YOUTUBE_HANDLER_AVAILABLE and not self.config:
+            # Fallback to old behavior if config not available
+            self.youtube_processor = YouTubeProcessor()
+            print("✅ YouTube handler enabled (fallback mode)")
         else:
-            self.youtube_processor = None
+            print("⚠️ YouTube handler disabled")
 
-        # AI functionality
-        if AI_HANDLER_AVAILABLE:
+        if self.config and self.config.is_feature_enabled("ai") and AI_HANDLER_AVAILABLE:
             self.ai_processor = AIProcessor()
+            print("✅ AI handler enabled via configuration")
+        elif AI_HANDLER_AVAILABLE and not self.config:
+            # Fallback to old behavior if config not available
+            self.ai_processor = AIProcessor()
+            print("✅ AI handler enabled (fallback mode)")
         else:
-            self.ai_processor = None
+            print("⚠️ AI handler disabled")
 
-        # Media functionality
-        if MEDIA_HANDLER_AVAILABLE:
+        if self.config and self.config.is_feature_enabled("media") and MEDIA_HANDLER_AVAILABLE:
+            media_config = self.config.get_feature_config("media")
+            temp_dir = media_config.get("temp_dir", self.temp_media_dir)
+            self.media_processor = MediaProcessor(temp_media_dir=temp_dir)
+            print("✅ Media handler enabled via configuration")
+        elif MEDIA_HANDLER_AVAILABLE and not self.config:
+            # Fallback to old behavior if config not available
             self.media_processor = MediaProcessor(temp_media_dir=self.temp_media_dir)
+            print("✅ Media handler enabled (fallback mode)")
         else:
-            self.media_processor = None
+            print("⚠️ Media handler disabled")
 
         # Dynamic bot name handling
         self.current_display_name = None  # No fallback

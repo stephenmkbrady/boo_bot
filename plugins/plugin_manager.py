@@ -24,23 +24,40 @@ class PluginFileHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         
-        if not event.src_path.endswith('plugin.py'):
+        # Handle plugin file changes
+        if event.src_path.endswith('plugin.py'):
+            # Debounce rapid file changes
+            current_time = time.time()
+            if event.src_path in self.last_modified:
+                if current_time - self.last_modified[event.src_path] < self.debounce_time:
+                    return
+            
+            self.last_modified[event.src_path] = current_time
+            
+            # Schedule reload in the main thread
+            plugin_file = Path(event.src_path)
+            asyncio.run_coroutine_threadsafe(
+                self.plugin_manager._handle_file_change(plugin_file),
+                self.plugin_manager.loop
+            )
             return
         
-        # Debounce rapid file changes
-        current_time = time.time()
-        if event.src_path in self.last_modified:
-            if current_time - self.last_modified[event.src_path] < self.debounce_time:
-                return
-        
-        self.last_modified[event.src_path] = current_time
-        
-        # Schedule reload in the main thread
-        plugin_file = Path(event.src_path)
-        asyncio.run_coroutine_threadsafe(
-            self.plugin_manager._handle_file_change(plugin_file),
-            self.plugin_manager.loop
-        )
+        # Handle config file changes
+        if event.src_path.endswith('plugins.yaml') and 'config' in event.src_path:
+            # Debounce config changes
+            current_time = time.time()
+            if event.src_path in self.last_modified:
+                if current_time - self.last_modified[event.src_path] < self.debounce_time:
+                    return
+            
+            self.last_modified[event.src_path] = current_time
+            
+            # Schedule config reload
+            asyncio.run_coroutine_threadsafe(
+                self.plugin_manager._handle_config_change(),
+                self.plugin_manager.loop
+            )
+            return
     
     def on_deleted(self, event):
         if event.is_directory:
@@ -77,13 +94,27 @@ class PluginManager:
             self.loop = asyncio.get_event_loop()
             self.file_handler = PluginFileHandler(self)
             self.file_observer = Observer()
+            
+            # Watch plugins directory for plugin changes
             self.file_observer.schedule(
                 self.file_handler, 
                 str(self.plugins_dir), 
                 recursive=True
             )
+            
+            # Watch config directory for configuration changes
+            config_dir = Path("config")
+            if config_dir.exists():
+                self.file_observer.schedule(
+                    self.file_handler,
+                    str(config_dir),
+                    recursive=True
+                )
+                print("🔥 Hot reloading enabled - watching plugins and config...")
+            else:
+                print("🔥 Hot reloading enabled - watching plugins only...")
+            
             self.file_observer.start()
-            print("🔥 Hot reloading enabled - watching for plugin changes...")
         except Exception as e:
             print(f"⚠️ Could not start hot reloading: {e}")
     
@@ -114,6 +145,20 @@ class PluginManager:
         
         if plugin_name in self.plugins:
             await self.unload_plugin(plugin_name)
+    
+    async def _handle_config_change(self):
+        """Handle configuration file changes"""
+        print(f"⚙️ Configuration file changed - reloading all plugins...")
+        
+        # Reload all plugins to pick up new configuration
+        plugin_names = list(self.plugins.keys())
+        for plugin_name in plugin_names:
+            try:
+                await self.reload_plugin(plugin_name)
+            except Exception as e:
+                print(f"❌ Error reloading plugin {plugin_name} after config change: {e}")
+        
+        print(f"✅ Configuration reload complete")
 
     async def discover_and_load_plugins(self, bot_instance) -> Dict[str, bool]:
         """Automatically discover and load all plugins from plugins directory"""

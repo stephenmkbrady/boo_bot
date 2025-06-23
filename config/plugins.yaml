@@ -26,3 +26,9 @@ core:
   enabled: true
   config:
     debug_enabled: true
+
+example:
+  enabled: true  # Disabled by default - this is a skeleton/template plugin
+  config:
+    demo_mode: true
+    max_echo_length: 1000

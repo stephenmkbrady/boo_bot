@@ -18,7 +18,7 @@ class CorePlugin(BotPlugin):
         return True
     
     def get_commands(self) -> List[str]:
-        return ["debug", "talk", "help", "ping", "room", "refresh", "update", "name", "status", "plugins", "reload", "enable", "disable"]
+        return ["debug", "talk", "help", "ping", "room", "refresh", "update", "name", "status", "plugins", "reload", "enable", "disable", "config"]
     
     async def handle_command(self, command: str, args: str, room_id: str, user_id: str, bot_instance) -> Optional[str]:
         self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
@@ -46,6 +46,8 @@ class CorePlugin(BotPlugin):
                 return await self._handle_enable(args, bot_instance)
             elif command == "disable":
                 return await self._handle_disable(args, bot_instance)
+            elif command == "config":
+                return await self._handle_config(args, bot_instance)
             elif command == "room":
                 return await self._handle_room_command(room_id, bot_instance)
             elif command in ["refresh", "update"] and args == "name":
@@ -203,3 +205,26 @@ Power Level: {room.power_levels.get(bot_instance.user_id, 0)}"""
                 return "❌ Name refresh not available"
         except Exception as e:
             return f"❌ Error refreshing name: {str(e)}"
+    
+    async def _handle_config(self, args: str, bot_instance) -> str:
+        """Handle config command"""
+        if not bot_instance.plugin_manager:
+            return "❌ Plugin manager not available"
+        
+        args = args.strip().lower()
+        
+        if args == "reload":
+            try:
+                await bot_instance.plugin_manager._handle_config_change()
+                return "✅ Configuration reloaded - all plugins restarted with new config"
+            except Exception as e:
+                return f"❌ Error reloading configuration: {str(e)}"
+        elif args == "":
+            return """⚙️ **Configuration Commands:**
+
+• `config reload` - Reload plugins.yaml and restart all plugins
+• `config` - Show this help
+
+**Note:** Configuration changes in `config/plugins.yaml` are automatically detected and applied via hot reloading."""
+        else:
+            return "❌ Unknown config command. Use `config` for help."

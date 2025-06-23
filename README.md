@@ -7,6 +7,10 @@ This repository contains the `boo_bot` project, a proof-of-concept Matrix chatbo
 ## Features
 
 *   **Matrix Homeserver Integration:** Communicates with a Matrix homeserver to send and receive messages.
+*   **Clean Plugin Architecture:** Modular plugin system with hot reloading and automatic discovery.
+*   **File Upload Support:** Upload files (like YouTube subtitles) directly to Matrix rooms.
+*   **YouTube Integration:** Extract subtitles, generate summaries, and answer questions about videos.
+*   **AI-Powered Features:** Magic 8-ball, advice generation, and Bible verse selection using NIST quantum randomness.
 *   **Database Interaction:** Connects to an external database API for message and media storage.
 *   **Asynchronous Operations:** Built with `asyncio` for efficient handling of I/O-bound tasks.
 
@@ -63,7 +67,263 @@ MATRIX_ACCESS_TOKEN="syt_your_matrix_access_token"
 python boo_bot.py
 ```
 
-The API will be accessible at `http://localhost:8000`.
+The bot will connect to your Matrix homeserver and join the specified room.
+
+## Plugin System
+
+This bot features a modular plugin architecture that allows you to easily extend functionality without modifying the core bot code.
+
+### Available Plugins
+
+The bot comes with several built-in plugins:
+
+#### Core Plugin (`plugins/core/`)
+- **Commands:** `help`, `debug`, `ping`, `status`, `plugins`, `talk`, `room`, `refresh`, `update`, `name`, `reload`, `enable`, `disable`
+- **Description:** Essential bot commands for status, debugging, and plugin management
+
+#### YouTube Plugin (`plugins/youtube/`)
+- **Commands:** `youtube`, `yt`
+- **Description:** YouTube video processing, subtitles extraction, and AI summaries
+- **Usage:**
+  - `bot: youtube summary <URL>` - Get AI-powered video summary
+  - `bot: youtube subs <URL>` - Extract subtitles as downloadable text file
+  - `bot: youtube <question>` - Ask questions about processed videos
+
+#### AI Plugin (`plugins/ai/`)
+- **Commands:** `8ball`, `advice`, `advise`, `bible`, `song`, `nist`
+- **Description:** AI-powered features using NIST quantum randomness
+- **Usage:**
+  - `bot: 8ball <question>` - Magic 8-ball with quantum randomness
+  - `bot: advice <question>` - Get AI-generated advice
+  - `bot: bible` - Random Bible verse selection
+  - `bot: song <song name>` - Create YouTube search URL
+  - `bot: nist` - Get current NIST Randomness Beacon value
+
+#### Database Plugin (`plugins/database/`)
+- **Commands:** `db`
+- **Description:** Database health checks and statistics
+- **Usage:**
+  - `bot: db health` - Check database connectivity
+  - `bot: db stats` - View database statistics
+
+#### Example Plugin (`plugins/example/`)
+- **Commands:** `echo`, `repeat`, `example`
+- **Description:** Skeleton plugin for developers (disabled by default)
+- **Status:** 🔴 Disabled (for reference only)
+
+### Creating Custom Plugins
+
+You can easily create custom plugins by following this structure:
+
+#### 1. Create Plugin Directory Structure
+```bash
+mkdir plugins/myplugin
+touch plugins/myplugin/__init__.py
+touch plugins/myplugin/plugin.py
+```
+
+#### 2. Implement Plugin Class
+Create `plugins/myplugin/plugin.py`:
+
+```python
+from typing import List, Optional
+import logging
+from plugins.plugin_interface import BotPlugin
+
+class MyCustomPlugin(BotPlugin):
+    def __init__(self):
+        super().__init__("myplugin")
+        self.version = "1.0.0"
+        self.description = "My custom plugin description"
+        self.logger = logging.getLogger(f"plugin.{self.name}")
+    
+    async def initialize(self, bot_instance) -> bool:
+        """Initialize plugin with bot instance"""
+        self.bot = bot_instance
+        self.logger.info("My custom plugin initialized")
+        return True
+    
+    def get_commands(self) -> List[str]:
+        """Return list of commands this plugin handles"""
+        return ["mycommand", "another"]
+    
+    async def handle_command(self, command: str, args: str, room_id: str, user_id: str, bot_instance) -> Optional[str]:
+        """Handle commands for this plugin"""
+        if command == "mycommand":
+            return f"Hello {user_id}! You said: {args}"
+        elif command == "another":
+            return "This is another command!"
+        return None
+    
+    async def cleanup(self):
+        """Cleanup when plugin is unloaded"""
+        self.logger.info("My custom plugin cleanup completed")
+```
+
+#### 3. Plugin Development Guidelines
+
+**Required Methods:**
+- `__init__()` - Initialize plugin with name, version, description
+- `get_commands()` - Return list of command strings
+- `handle_command()` - Process commands and return responses
+- `initialize()` - Setup plugin with bot instance (optional)
+- `cleanup()` - Clean up resources when unloaded (optional)
+
+**Best Practices:**
+- ✅ Use descriptive plugin and command names
+- ✅ Add comprehensive error handling
+- ✅ Include usage instructions in command responses
+- ✅ Use logging for debugging: `self.logger.info/error/debug()`
+- ✅ Return `None` if command not handled
+- ✅ Return string responses for successful commands
+- ✅ Handle empty/missing arguments gracefully
+
+**Plugin Features:**
+- 🔥 **Hot Reloading:** Plugins reload automatically when files change
+- 🔍 **Auto Discovery:** Just drop plugin folders in `plugins/` directory
+- ⚡ **Async Support:** Full async/await support for I/O operations
+- 🛡️ **Error Isolation:** Plugin errors don't crash the bot
+- 📊 **Runtime Management:** Enable/disable plugins without restart
+
+#### 4. Using the Example Plugin
+
+The bot includes a skeleton example plugin at `plugins/example/`. To use it as a template:
+
+1. **Copy the example plugin:**
+   ```bash
+   cp -r plugins/example plugins/mynewplugin
+   ```
+
+2. **Edit the plugin file:**
+   ```bash
+   nano plugins/mynewplugin/plugin.py
+   ```
+
+3. **Configure your plugin:**
+   Add your plugin to `config/plugins.yaml`:
+   ```yaml
+   mynewplugin:
+     enabled: true
+     config:
+       my_setting: "value"
+       timeout: 30
+   ```
+
+4. **Modify the class:**
+   - Change class name from `ExamplePlugin` to `MyNewPlugin`
+   - Update plugin name, commands, and functionality
+   - Implement configuration loading in `initialize()`
+
+5. **Test your plugin:**
+   The bot will automatically discover and load your new plugin with hot reloading!
+
+#### 5. Advanced Plugin Features
+
+**File Operations:**
+```python
+# Upload files to Matrix rooms
+await bot_instance.send_file(room_id, file_path, filename, mimetype)
+
+# Send messages
+await bot_instance.send_message(room_id, "Hello!")
+```
+
+**Database Integration:**
+```python
+# Access database if available
+if bot_instance.db_enabled:
+    await bot_instance.store_message_in_db(room_id, event_id, sender, type, content)
+```
+
+**Plugin Communication:**
+```python
+# Access other plugins
+other_plugin = bot_instance.plugin_manager.plugins.get("otherplugin")
+if other_plugin and other_plugin.enabled:
+    # Use other plugin functionality
+```
+
+### Plugin Management Commands
+
+- `bot: plugins` - List all loaded plugins and their status
+- `bot: reload <plugin_name>` - Reload a specific plugin
+- `bot: enable <plugin_name>` - Enable a disabled plugin  
+- `bot: disable <plugin_name>` - Disable a running plugin
+
+### Plugin Configuration
+
+Plugins can be configured via the `config/plugins.yaml` file. This allows you to:
+- ✅ Enable/disable plugins globally
+- ⚙️ Configure plugin-specific settings
+- 🎛️ Override default plugin behavior
+
+#### Configuration File Structure (`config/plugins.yaml`)
+
+```yaml
+youtube:
+  enabled: true
+  config:
+    max_cached_per_room: 5
+    chunk_size: 8000
+
+ai:
+  enabled: true
+  config:
+    model: "cognitivecomputations/dolphin3.0-mistral-24b:free"
+    temperature: 0.3
+    max_tokens: 500
+
+database:
+  enabled: true
+  config:
+    timeout: 30
+
+core:
+  enabled: true
+  config:
+    debug_enabled: true
+
+example:
+  enabled: false  # Disabled by default - skeleton template
+  config:
+    demo_mode: true
+    max_echo_length: 1000
+```
+
+#### Configuration Usage in Plugins
+
+Plugins can access their configuration through the bot config system:
+
+```python
+from config import BotConfig
+
+class MyPlugin(BotPlugin):
+    async def initialize(self, bot_instance) -> bool:
+        # Load bot configuration
+        config = BotConfig()
+        
+        # Check if plugin is enabled in config
+        if not config.is_plugin_enabled(self.name):
+            self.enabled = False
+            return True
+        
+        # Get plugin-specific configuration
+        plugin_config = config.get_plugin_config(self.name)
+        self.timeout = plugin_config.get("timeout", 30)
+        self.max_items = plugin_config.get("max_items", 10)
+        
+        return True
+```
+
+#### Configuration vs Runtime Management
+
+- **🗂️ YAML Configuration**: Persistent settings that survive bot restarts
+- **⚡ Runtime Commands**: Temporary changes via `enable`/`disable` commands
+- **🔄 Priority**: Runtime commands override YAML configuration until restart
+
+### Plugin Hot Reloading
+
+The bot automatically watches for changes in plugin files and reloads them without requiring a restart. Simply save your plugin file and the changes will take effect immediately!
 
 ## Testing
 

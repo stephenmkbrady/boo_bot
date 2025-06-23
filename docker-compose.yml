@@ -18,6 +18,9 @@ services:
       # Persist bot_store and temp_media directories
       - ./bot_store:/app/bot_store
       - ./temp_media:/app/temp_media
+      # Mount config and plugins directories for hot reloading
+      - ./config:/app/config
+      - ./plugins:/app/plugins
     restart: unless-stopped
 
   boo_bot_tests:

@@ -3,7 +3,7 @@ import logging
 import os
 import aiohttp
 import time
-from .plugin_base import BotPlugin
+from plugins.plugin_interface import BotPlugin
 
 
 class AIProcessor:
@@ -317,17 +317,23 @@ Be creative, weird, and funny while maintaining the {polarity_instruction.lower(
 
 
 class AIPlugin(BotPlugin):
-    def __init__(self, openrouter_key: str = None):
+    def __init__(self):
         super().__init__("ai")
+        self.version = "1.0.0"
+        self.description = "AI-powered features including magic 8-ball, advice, and Bible verses"
         self.logger = logging.getLogger(f"plugin.{self.name}")
-        
         self.handler = AIProcessor()
+    
+    async def initialize(self, bot_instance) -> bool:
+        """Initialize plugin with bot instance"""
+        self.bot = bot_instance
         self.logger.info("AI plugin initialized successfully with embedded AIProcessor")
+        return True
     
     def get_commands(self) -> List[str]:
         return ["8ball", "advice", "advise", "bible", "song", "nist"]
     
-    async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+    async def handle_command(self, command: str, args: str, room_id: str, user_id: str, bot_instance) -> Optional[str]:
         self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
         
         if not self.handler:
@@ -368,6 +374,32 @@ class AIPlugin(BotPlugin):
                 await self.handler.handle_bible_verse(room_id, False, capture_response)
                 # Return all messages joined together
                 return "\n".join(response_container) if response_container else "❌ No Bible verse available"
+                
+            elif command == "song":
+                if not args:
+                    return "❌ Please provide a song to search for. Usage: song <song name>"
+                
+                # Import the YouTube URL creation function
+                try:
+                    from plugins.youtube.plugin import create_Youtube_url
+                    youtube_url = create_Youtube_url(args)
+                    if youtube_url:
+                        return f"🎵 YouTube search for '{args}':\n{youtube_url}"
+                    else:
+                        return f"❌ Could not create YouTube search URL for '{args}'"
+                except ImportError:
+                    return "❌ YouTube functionality not available"
+                except Exception as e:
+                    self.logger.error(f"Error creating YouTube URL: {e}")
+                    return f"❌ Error creating YouTube search for '{args}'"
+                    
+            elif command == "nist":
+                try:
+                    beacon_value = await self.handler.get_nist_beacon_random_number()
+                    return f"🔢 **Current NIST Randomness Beacon Value:**\n```\n{beacon_value}\n```\n\nThis is a cryptographically secure random number from the U.S. National Institute of Standards and Technology."
+                except Exception as e:
+                    self.logger.error(f"Error getting NIST beacon value: {e}")
+                    return "❌ Could not retrieve NIST Randomness Beacon value"
                 
         except Exception as e:
             self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)

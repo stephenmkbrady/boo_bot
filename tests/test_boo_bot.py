@@ -3,8 +3,8 @@ import asyncio
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from datetime import datetime, timedelta
-from boo_bot import DebugMatrixBot
-from youtube_handler import create_Youtube_url
+from boo_bot import CleanMatrixBot
+from plugins.youtube.plugin import create_Youtube_url
 
 # Mock the nio.AsyncClient and other external dependencies
 @pytest.fixture
@@ -27,7 +27,7 @@ def mock_nio_asyncclient():
 # Mock the api_client.ChatDatabaseClient
 @pytest.fixture
 def mock_chat_database_client():
-    with patch('boo_bot.ChatDatabaseClient') as MockChatDatabaseClient:
+    with patch('plugins.database.plugin.ChatDatabaseClient') as MockChatDatabaseClient:
         mock_db_client_instance = MockChatDatabaseClient.return_value
         mock_db_client_instance.store_message = AsyncMock(return_value={"id": 123})
         mock_db_client_instance.health_check = AsyncMock(return_value=True)
@@ -53,7 +53,7 @@ def mock_env_vars():
 # Fixture for a bot instance with mocked dependencies
 @pytest_asyncio.fixture
 async def bot_instance(mock_nio_asyncclient, mock_chat_database_client, mock_env_vars):
-    bot = DebugMatrixBot(
+    bot = CleanMatrixBot(
         homeserver="https://matrix.org",
         user_id="@testuser:matrix.org",
         password="testpassword",
@@ -67,11 +67,254 @@ async def bot_instance(mock_nio_asyncclient, mock_chat_database_client, mock_env
     # Set the display name for command processing - this is what the tests expect
     bot.current_display_name = "boo"
     
+    # Initialize plugins for command testing
+    if bot.plugin_manager:
+        await bot.initialize_plugins()
+    
     yield bot
+
+# Test for message reading functionality - these tests should catch the display name issue
+@pytest.mark.asyncio
+async def test_text_message_callback_with_display_name(bot_instance, mock_nio_asyncclient):
+    """Test that messages are processed when display name is set"""
+    mock_room = MagicMock()
+    mock_room.room_id = "!test:matrix.org"
+    mock_room.name = "Test Room"
+    
+    mock_event = MagicMock()
+    mock_event.sender = "@otheruser:matrix.org"
+    mock_event.body = "boo: help"
+    
+    # Ensure display name is set
+    bot_instance.current_display_name = "boo"
+    
+    # Call text_message_callback directly
+    await bot_instance.text_message_callback(mock_room, mock_event)
+    
+    # Should have incremented counter
+    assert bot_instance.event_counters['text_messages'] == 1
+
+@pytest.mark.asyncio
+async def test_text_message_callback_without_display_name(bot_instance, mock_nio_asyncclient):
+    """Test that messages are ignored when display name is not set"""
+    mock_room = MagicMock()
+    mock_room.room_id = "!test:matrix.org"
+    mock_room.name = "Test Room"
+    
+    mock_event = MagicMock()
+    mock_event.sender = "@otheruser:matrix.org"
+    mock_event.body = "boo: help"
+    
+    # Clear display name to simulate the bug
+    bot_instance.current_display_name = None
+    
+    # Call text_message_callback directly
+    await bot_instance.text_message_callback(mock_room, mock_event)
+    
+    # Should still increment counter (message was received)
+    assert bot_instance.event_counters['text_messages'] == 1
+    # But no command processing should happen (no room_send calls)
+    mock_nio_asyncclient.room_send.assert_not_called()
+
+@pytest.mark.asyncio
+async def test_get_bot_display_name_success(bot_instance, mock_nio_asyncclient):
+    """Test successful display name retrieval"""
+    # Mock get_displayname response as async
+    mock_response = MagicMock()
+    mock_response.displayname = "TestBot"
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    display_name = await bot_instance.get_bot_display_name()
+    assert display_name == "TestBot"
+
+@pytest.mark.asyncio
+async def test_get_bot_display_name_none(bot_instance, mock_nio_asyncclient):
+    """Test when no display name is set"""
+    # Mock get_displayname response with no display name
+    mock_response = MagicMock()
+    mock_response.displayname = None
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    display_name = await bot_instance.get_bot_display_name()
+    assert display_name is None
+
+@pytest.mark.asyncio
+async def test_get_bot_display_name_error(bot_instance, mock_nio_asyncclient):
+    """Test when display name retrieval fails"""
+    # Mock get_displayname to raise an exception
+    mock_nio_asyncclient.get_displayname = AsyncMock(side_effect=Exception("Network error"))
+    
+    display_name = await bot_instance.get_bot_display_name()
+    assert display_name is None
+
+@pytest.mark.asyncio
+async def test_update_command_prefix_success(bot_instance, mock_nio_asyncclient):
+    """Test successful command prefix update"""
+    # Mock get_displayname response
+    mock_response = MagicMock()
+    mock_response.displayname = "NewBot"
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    result = await bot_instance.update_command_prefix()
+    assert result is True
+    assert bot_instance.current_display_name == "NewBot"
+
+@pytest.mark.asyncio
+async def test_update_command_prefix_failure(bot_instance, mock_nio_asyncclient):
+    """Test failed command prefix update"""
+    # Mock get_displayname to fail
+    mock_nio_asyncclient.get_displayname = AsyncMock(side_effect=Exception("API Error"))
+    
+    result = await bot_instance.update_command_prefix()
+    assert result is False
+    assert bot_instance.current_display_name is None
+
+@pytest.mark.asyncio  
+async def test_display_name_response_format_debug(bot_instance, mock_nio_asyncclient):
+    """Debug test to understand display name response format"""
+    # Mock display name response as an async method
+    mock_response = MagicMock()
+    mock_response.displayname = "DebugBot"
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    # Test display name retrieval directly
+    display_name = await bot_instance.get_bot_display_name()
+    
+    # This should work if our mocking is correct
+    assert display_name == "DebugBot"
+
+# Test for plugin command routing
+@pytest.mark.asyncio
+async def test_youtube_command_routing(bot_instance, mock_nio_asyncclient):
+    """Test that YouTube commands are properly routed"""
+    # Mock the get_displayname method to avoid the async issue
+    mock_response = MagicMock()
+    mock_response.displayname = "boo"
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    mock_room = MagicMock()
+    mock_room.room_id = "!test:matrix.org"
+    mock_room.name = "Test Room"
+    
+    mock_event = MagicMock()
+    mock_event.sender = "@otheruser:matrix.org"
+    mock_event.body = "boo: youtube summary https://youtu.be/test"
+    mock_event.relates_to = None
+    
+    # Ensure display name is set
+    bot_instance.current_display_name = "boo"
+    
+    # This should route to the YouTube plugin
+    await bot_instance.text_message_callback(mock_room, mock_event)
+    
+    # Should have incremented counter and attempted to send response
+    assert bot_instance.event_counters['text_messages'] == 1
+    mock_nio_asyncclient.room_send.assert_called()
+
+@pytest.mark.asyncio
+async def test_song_command_functionality(bot_instance, mock_nio_asyncclient):
+    """Test that song command creates YouTube URLs"""
+    # Mock the get_displayname method to avoid the async issue
+    mock_response = MagicMock()
+    mock_response.displayname = "boo"
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    mock_room = MagicMock()
+    mock_room.room_id = "!test:matrix.org"
+    mock_room.name = "Test Room"
+    
+    mock_event = MagicMock()
+    mock_event.sender = "@otheruser:matrix.org"
+    mock_event.body = "boo: song Bohemian Rhapsody"
+    mock_event.relates_to = None
+    
+    # Ensure display name is set
+    bot_instance.current_display_name = "boo"
+    
+    # This should route to the AI plugin and create a YouTube URL
+    await bot_instance.text_message_callback(mock_room, mock_event)
+    
+    # Should have incremented counter and sent response
+    assert bot_instance.event_counters['text_messages'] == 1
+    mock_nio_asyncclient.room_send.assert_called()
+    
+    # Check that the response contains YouTube URL
+    call_args = mock_nio_asyncclient.room_send.call_args
+    response_content = call_args[1]['content']['body']
+    assert "youtube.com" in response_content.lower()
+
+@pytest.mark.asyncio
+async def test_unknown_command_handling(bot_instance, mock_nio_asyncclient):
+    """Test that unknown commands return proper error"""
+    # Mock the get_displayname method to avoid the async issue
+    mock_response = MagicMock()
+    mock_response.displayname = "boo"
+    mock_nio_asyncclient.get_displayname = AsyncMock(return_value=mock_response)
+    
+    mock_room = MagicMock()
+    mock_room.room_id = "!test:matrix.org"
+    mock_room.name = "Test Room"
+    
+    mock_event = MagicMock()
+    mock_event.sender = "@otheruser:matrix.org"
+    mock_event.body = "boo: nonexistentcommand"
+    mock_event.relates_to = None
+    
+    # Ensure display name is set
+    bot_instance.current_display_name = "boo"
+    
+    await bot_instance.text_message_callback(mock_room, mock_event)
+    
+    # Should have incremented counter and sent unknown command response
+    assert bot_instance.event_counters['text_messages'] == 1
+    mock_nio_asyncclient.room_send.assert_called()
+    
+    # Check that the response indicates unknown command
+    call_args = mock_nio_asyncclient.room_send.call_args
+    response_content = call_args[1]['content']['body']
+    assert "Unknown command" in response_content
+
+@pytest.mark.asyncio
+async def test_file_upload_functionality(bot_instance, mock_nio_asyncclient):
+    """Test that the send_file method works correctly"""
+    # Mock the upload response
+    mock_upload_response = MagicMock()
+    mock_upload_response.content_uri = "mxc://matrix.org/test123"
+    mock_nio_asyncclient.upload = AsyncMock(return_value=mock_upload_response)
+    
+    # Create a temporary test file
+    import tempfile
+    import os
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+        f.write("Test file content")
+        temp_file_path = f.name
+    
+    try:
+        # Test file upload
+        success = await bot_instance.send_file("!test:matrix.org", temp_file_path, "test.txt", "text/plain")
+        
+        # Verify upload was called
+        mock_nio_asyncclient.upload.assert_called_once()
+        
+        # Verify room_send was called with file content
+        mock_nio_asyncclient.room_send.assert_called()
+        call_args = mock_nio_asyncclient.room_send.call_args
+        content = call_args[1]['content']
+        
+        assert content['msgtype'] == 'm.file'
+        assert content['filename'] == 'test.txt'
+        assert content['url'] == 'mxc://matrix.org/test123'
+        assert success is True
+        
+    finally:
+        # Clean up test file
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 # Test for parse_vtt
 def test_parse_vtt():
-    from youtube_handler import YouTubeProcessor
+    from plugins.youtube.plugin import YouTubeProcessor
     vtt_content = """WEBVTT
 
 00:00:01.000 --> 00:00:03.000
@@ -88,13 +331,13 @@ This is a test.
     assert processor.parse_vtt(vtt_content) == expected_text
 
 def test_parse_vtt_empty():
-    from youtube_handler import YouTubeProcessor
+    from plugins.youtube.plugin import YouTubeProcessor
     vtt_content = "WEBVTT\n\n"
     processor = YouTubeProcessor()
     assert processor.parse_vtt(vtt_content) == ""
 
 def test_parse_vtt_no_text():
-    from youtube_handler import YouTubeProcessor
+    from plugins.youtube.plugin import YouTubeProcessor
     vtt_content = """WEBVTT
 
 00:00:01.000 --> 00:00:03.000

@@ -5,7 +5,7 @@ import aiofiles
 import json
 from datetime import datetime
 from pathlib import Path
-from .plugin_base import BotPlugin
+from plugins.plugin_interface import BotPlugin
 
 
 class ChatDatabaseClient:
@@ -211,17 +211,25 @@ class ChatDatabaseClient:
 
 
 class DatabasePlugin(BotPlugin):
-    def __init__(self, bot_instance=None):
+    def __init__(self):
         super().__init__("database")
-        self.bot = bot_instance
+        self.version = "1.0.0"
+        self.description = "Database integration for storing and retrieving Matrix messages"
         self.logger = logging.getLogger(f"plugin.{self.name}")
+        self.bot = None
+    
+    async def initialize(self, bot_instance) -> bool:
+        """Initialize plugin with bot instance"""
+        self.bot = bot_instance
         # Only enable if database is available
         self.enabled = bot_instance and getattr(bot_instance, 'db_enabled', False)
+        self.logger.info("Database plugin initialized successfully")
+        return True
     
     def get_commands(self) -> List[str]:
         return ["db"]
     
-    async def handle_command(self, command: str, args: str, room_id: str, user_id: str) -> Optional[str]:
+    async def handle_command(self, command: str, args: str, room_id: str, user_id: str, bot_instance) -> Optional[str]:
         self.logger.info(f"Handling {command} command from {user_id} in {room_id}")
         
         if not self.bot or not self.enabled:

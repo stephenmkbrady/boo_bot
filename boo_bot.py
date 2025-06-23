@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Matrix Chatbot with Enhanced Media Message Detection 
+Matrix Chatbot with Clean Plugin Architecture
 """
 
-print("🚀 Starting Simplified Matrix Bot with Enhanced Media Detection, NIST Beacon, and YouTube Features...")
+print("🚀 Starting Clean Matrix Bot with Plugin System...")
 
-# Add debug imports with error handling
+# Core imports only - NO plugin-specific imports
 try:
     import asyncio
     import json
@@ -16,7 +16,6 @@ try:
     import subprocess
     from datetime import datetime
     from pathlib import Path
-    from collections import OrderedDict
     from typing import Dict, Optional, Tuple
     print("✅ Standard library modules imported successfully")
 except ImportError as e:
@@ -28,7 +27,6 @@ try:
     print("✅ dotenv imported successfully")
 except ImportError as e:
     print(f"❌ Failed to import dotenv: {e}")
-    print("Install with: pip install python-dotenv")
     exit(1)
 
 try:
@@ -56,93 +54,18 @@ try:
     print("✅ matrix-nio imported successfully")
 except ImportError as e:
     print(f"❌ Failed to import matrix-nio: {e}")
-    print("Install with: pip install matrix-nio")
     exit(1)
 
-# Database client now embedded in database plugin
-try:
-    from plugins.database_plugin import ChatDatabaseClient
-    print("✅ ChatDatabaseClient imported successfully from database plugin")
-    DATABASE_CLIENT_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Warning: Could not import ChatDatabaseClient from database plugin: {e}")
-    print("Database features will be disabled.")
-    DATABASE_CLIENT_AVAILABLE = False
-
-    # Create a dummy class so the code doesn't crash
-    class ChatDatabaseClient:
-        def __init__(self, *args, **kwargs):
-            pass
-
-# Try to import youtube handler
-try:
-    from youtube_handler import youtube_handler, create_Youtube_url, YouTubeProcessor
-    print("✅ youtube_handler imported successfully")
-    YOUTUBE_HANDLER_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Warning: Could not import youtube_handler: {e}")
-    print("YouTube audio download features will be disabled.")
-    YOUTUBE_HANDLER_AVAILABLE = False
-
-print("🔍 About to import AI functionality...")
-# AI functionality now embedded in ai_plugin
-try:
-    print("🔍 Attempting to import AIProcessor...")
-    from plugins.ai_plugin import AIProcessor
-    AI_HANDLER_AVAILABLE = True
-    print("✅ AI functionality available via plugin system")
-    print(f"✅ AIProcessor class available: {AIProcessor}")
-except ImportError as e:
-    print(f"⚠️ Warning: Could not import AIProcessor from ai_plugin: {e}")
-    AI_HANDLER_AVAILABLE = False
-    AIProcessor = None
-except Exception as e:
-    print(f"❌ Unexpected error importing AIProcessor: {e}")
-    import traceback
-    traceback.print_exc()
-    AI_HANDLER_AVAILABLE = False
-    AIProcessor = None
-
-try:
-    from media_handler import MediaProcessor
-    print("✅ media_handler imported successfully")
-    MEDIA_HANDLER_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Warning: Could not import media_handler: {e}")
-    print("Media processing features will be disabled.")
-    MEDIA_HANDLER_AVAILABLE = False
-
-try:
-    from config import BotConfig
-    print("✅ config imported successfully")
-    CONFIG_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Warning: Could not import config: {e}")
-    print("Configuration management will be disabled.")
-    CONFIG_AVAILABLE = False
-
-try:
-    from logging_setup import setup_logging
-    print("✅ logging setup imported successfully")
-    LOGGING_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Warning: Could not import logging setup: {e}")
-    print("Advanced logging will be disabled.")
-    LOGGING_AVAILABLE = False
-
+# Import ONLY the plugin manager - not specific plugins
 try:
     from plugins.plugin_manager import PluginManager
-    from plugins.youtube_plugin import YouTubePlugin
-    from plugins.ai_plugin import AIPlugin
-    from plugins.core_plugin import CorePlugin
-    from plugins.database_plugin import DatabasePlugin
-    print("✅ plugin system imported successfully")
+    print("✅ Plugin manager imported successfully")
     PLUGIN_SYSTEM_AVAILABLE = True
 except ImportError as e:
-    print(f"⚠️ Warning: Could not import plugin system: {e}")
-    print("Plugin system will be disabled.")
+    print(f"⚠️ Warning: Could not import plugin manager: {e}")
     PLUGIN_SYSTEM_AVAILABLE = False
 
+# Optional imports for enhanced features
 try:
     import aiohttp
     import aiofiles
@@ -150,7 +73,7 @@ try:
     print("✅ aiohttp and aiofiles imported successfully")
 except ImportError:
     AIOHTTP_AVAILABLE = False
-    print("⚠️ Warning: aiohttp/aiofiles not installed. Media download and NIST/AI/YouTube features will be disabled.")
+    print("⚠️ Warning: aiohttp/aiofiles not installed.")
 
 try:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -158,63 +81,35 @@ try:
     import base64
     import hashlib
     CRYPTO_AVAILABLE = True
-    print("✅ cryptography library available for media decryption")
+    print("✅ cryptography library available")
 except ImportError:
     CRYPTO_AVAILABLE = False
-    print("⚠️ Warning: cryptography library not installed. Manual decryption will be disabled.")
-    print("   Install with: pip install cryptography")
+    print("⚠️ Warning: cryptography library not installed.")
 
-# Force load .env from current directory
+# Load environment variables
 load_dotenv('./.env')
-print(f"🔧 EXPLICIT CHECK - DATABASE_API_KEY: {os.getenv('DATABASE_API_KEY')}")
-print(f"🔧 EXPLICIT CHECK - DATABASE_API_URL: {os.getenv('DATABASE_API_URL')}")
 
-class DebugMatrixBot:
-    def __init__(self, homeserver, user_id, password, device_name="SimplifiedChatBot"):
-        print(f"🤖 Initializing Simplified MatrixBot...")
+class CleanMatrixBot:
+    def __init__(self, homeserver, user_id, password, device_name="CleanMatrixBot"):
+        print(f"🤖 Initializing Clean Matrix Bot...")
         print(f"   Homeserver: {homeserver}")
         print(f"   User ID: {user_id}")
         print(f"   Device: {device_name}")
-
-        # Initialize logging system
-        if LOGGING_AVAILABLE:
-            self.logger = setup_logging(level="INFO", log_file="bot.log")
-            self.logger.info("Bot starting up - logging system initialized")
-            print(f"✅ Logging system initialized")
-        else:
-            self.logger = None
-            print(f"⚠️ Logging system disabled")
-
-        # Initialize configuration system
-        if CONFIG_AVAILABLE:
-            self.config = BotConfig()
-            if self.logger:
-                self.logger.info("Configuration system initialized")
-            print(f"✅ Configuration system initialized")
-        else:
-            self.config = None
-            if self.logger:
-                self.logger.warning("Configuration system disabled")
-            print(f"⚠️ Configuration system disabled")
 
         self.homeserver = homeserver
         self.user_id = user_id
         self.password = password
         self.device_name = device_name
 
-        # Store path for encryption keys
+        # Core bot properties
         self.store_path = "./bot_store"
-
-        # Ensure store directory exists
-        os.makedirs(self.store_path, exist_ok=True)
-        print(f"✅ Bot store directory ready: {self.store_path}")
-
-        # Create temp directory for media downloads
         self.temp_media_dir = "./temp_media"
+        
+        # Ensure directories exist
+        os.makedirs(self.store_path, exist_ok=True)
         os.makedirs(self.temp_media_dir, exist_ok=True)
-        print(f"✅ Temporary media directory ready: {self.temp_media_dir}")
 
-        # Counters for debugging
+        # Event counters
         self.event_counters = {
             'text_messages': 0,
             'media_messages': 0,
@@ -223,48 +118,11 @@ class DebugMatrixBot:
             'decryption_failures': 0
         }
 
-        # Initialize handlers based on configuration
-        self.youtube_processor = None
-        self.ai_processor = None
-        self.media_processor = None
-        
-        if self.config and self.config.is_feature_enabled("youtube") and YOUTUBE_HANDLER_AVAILABLE:
-            self.youtube_processor = YouTubeProcessor()
-            print("✅ YouTube handler enabled via configuration")
-        elif YOUTUBE_HANDLER_AVAILABLE and not self.config:
-            # Fallback to old behavior if config not available
-            self.youtube_processor = YouTubeProcessor()
-            print("✅ YouTube handler enabled (fallback mode)")
-        else:
-            print("⚠️ YouTube handler disabled")
+        # Bot name handling
+        self.current_display_name = None
+        self.last_name_check = None
 
-        if self.config and self.config.is_feature_enabled("ai") and AI_HANDLER_AVAILABLE:
-            self.ai_processor = AIProcessor()
-            print("✅ AI handler enabled via configuration")
-        elif AI_HANDLER_AVAILABLE and not self.config:
-            # Fallback to old behavior if config not available
-            self.ai_processor = AIProcessor()
-            print("✅ AI handler enabled (fallback mode)")
-        else:
-            print("⚠️ AI handler disabled")
-
-        if self.config and self.config.is_feature_enabled("media") and MEDIA_HANDLER_AVAILABLE:
-            media_config = self.config.get_feature_config("media")
-            temp_dir = media_config.get("temp_dir", self.temp_media_dir)
-            self.media_processor = MediaProcessor(temp_media_dir=temp_dir)
-            print("✅ Media handler enabled via configuration")
-        elif MEDIA_HANDLER_AVAILABLE and not self.config:
-            # Fallback to old behavior if config not available
-            self.media_processor = MediaProcessor(temp_media_dir=self.temp_media_dir)
-            print("✅ Media handler enabled (fallback mode)")
-        else:
-            print("⚠️ Media handler disabled")
-
-        # Dynamic bot name handling
-        self.current_display_name = None  # No fallback
-        self.last_name_check = None  # Track when we last checked the name
-
-        # Initialize client with store path
+        # Initialize Matrix client
         try:
             self.client = AsyncClient(homeserver, user_id, store_path=self.store_path)
             print("✅ AsyncClient initialized successfully")
@@ -272,242 +130,119 @@ class DebugMatrixBot:
             print(f"❌ Failed to initialize AsyncClient: {e}")
             raise
 
-        # Initialize database client
-        self.db_client = None
-        self.db_enabled = False
-        if DATABASE_CLIENT_AVAILABLE:
-            self._init_database_client()
-        else:
-            print("⚠️ Database client not available - skipping initialization")
-
-        # Initialize plugin system (after database init)
+        # Initialize plugin system - NO hard-coded plugins!
         self.plugin_manager = None
         if PLUGIN_SYSTEM_AVAILABLE:
-            self._setup_plugins()
+            self.plugin_manager = PluginManager()
+            print("✅ Plugin manager initialized")
         else:
-            print("⚠️ Plugin system disabled")
+            print("⚠️ Plugin system not available")
+        
+        # Database client for testing
+        self.db_enabled = False
+        self.db_client = None
 
-        # Add event callbacks for ALL message types + debugging
+        # Register event callbacks
+        self._register_event_callbacks()
+
+    def _register_event_callbacks(self):
+        """Register Matrix event callbacks"""
         try:
             # Text messages
             self.client.add_event_callback(self.text_message_callback, RoomMessageText)
 
-            # Regular (unencrypted) media messages - delegate to media processor
-            if self.media_processor:
-                self.client.add_event_callback(self.media_message_callback_wrapper, RoomMessageImage)
-                self.client.add_event_callback(self.media_message_callback_wrapper, RoomMessageFile)
-                self.client.add_event_callback(self.media_message_callback_wrapper, RoomMessageAudio)
-                self.client.add_event_callback(self.media_message_callback_wrapper, RoomMessageVideo)
+            # Media messages
+            self.client.add_event_callback(self.media_message_callback, RoomMessageImage)
+            self.client.add_event_callback(self.media_message_callback, RoomMessageFile)
+            self.client.add_event_callback(self.media_message_callback, RoomMessageAudio)
+            self.client.add_event_callback(self.media_message_callback, RoomMessageVideo)
 
             # Encrypted media messages
             if ENCRYPTED_EVENTS_AVAILABLE:
-                self.client.add_event_callback(self.encrypted_media_message_callback, RoomEncryptedImage)
-                self.client.add_event_callback(self.encrypted_media_message_callback, RoomEncryptedVideo)
-                self.client.add_event_callback(self.encrypted_media_message_callback, RoomEncryptedAudio)
-                self.client.add_event_callback(self.encrypted_media_message_callback, RoomEncryptedFile)
-                print("✅ Encrypted media callbacks registered!")
-            else:
-                print("⚠️ Encrypted media callbacks not available - using fallback")
+                self.client.add_event_callback(self.encrypted_media_callback, RoomEncryptedImage)
+                self.client.add_event_callback(self.encrypted_media_callback, RoomEncryptedVideo)
+                self.client.add_event_callback(self.encrypted_media_callback, RoomEncryptedAudio)
+                self.client.add_event_callback(self.encrypted_media_callback, RoomEncryptedFile)
 
-            # General message callback to catch anything we might miss
+            # General callbacks
             self.client.add_event_callback(self.general_message_callback, RoomMessage)
-
-            # Decryption issues
             self.client.add_event_callback(self.decryption_failure_callback, MegolmEvent)
 
-            # Catch ALL events for debugging
-            self.client.add_event_callback(self.debug_all_events_callback, Event)
-
-            print("✅ Event callbacks registered successfully (text + media + encrypted + debug)")
+            print("✅ Event callbacks registered successfully")
         except Exception as e:
             print(f"❌ Failed to register event callbacks: {e}")
             raise
 
-    def _init_database_client(self):
-        """Initialize the database client if API credentials are available"""
-        try:
-            api_url = os.getenv("DATABASE_API_URL")
-            api_key = os.getenv("DATABASE_API_KEY")
-
-            print(f"🔧 Database API URL: {api_url}")
-            print(f"🔧 Database API Key: {'*' * 10 if api_key else 'Not set'}")
-
-            if api_url and api_key:
-                self.db_client = ChatDatabaseClient(api_url, api_key)
-                self.db_enabled = True
-                print(f"✅ Database client initialized: {api_url}")
-            else:
-                print("⚠️ Database API credentials not found in .env - database features disabled")
-                print("   Add DATABASE_API_URL and DATABASE_API_KEY to enable database storage")
-        except Exception as e:
-            print(f"❌ Error initializing database client: {e}")
-            self.db_enabled = False
-
-    def _setup_plugins(self):
-        """Set up plugins based on configuration"""
-        try:
-            self.plugin_manager = PluginManager()
+    async def initialize_plugins(self):
+        """Initialize plugin system after bot is set up"""
+        if self.plugin_manager:
+            print("🔌 Discovering and loading plugins...")
+            results = await self.plugin_manager.discover_and_load_plugins(self)
             
-            # Add core plugin (always enabled)
-            if not self.config or self.config.is_plugin_enabled("core"):
-                core_plugin = CorePlugin(bot_instance=self)
-                self.plugin_manager.add_plugin(core_plugin)
-                print("✅ Core plugin added")
-            
-            # Add YouTube plugin if enabled in config
-            if self.config and self.config.is_plugin_enabled("youtube") and YOUTUBE_HANDLER_AVAILABLE:
-                youtube_plugin = YouTubePlugin(bot_instance=self)
-                self.plugin_manager.add_plugin(youtube_plugin)
-                print("✅ YouTube plugin added")
-            
-            # Add AI plugin if enabled in config
-            if self.config and self.config.is_plugin_enabled("ai") and AI_HANDLER_AVAILABLE:
-                ai_plugin = AIPlugin()
-                self.plugin_manager.add_plugin(ai_plugin)
-                print("✅ AI plugin added")
-            
-            # Add database plugin if enabled in config
-            if self.config and self.config.is_plugin_enabled("database") and DATABASE_CLIENT_AVAILABLE:
-                database_plugin = DatabasePlugin(bot_instance=self)
-                self.plugin_manager.add_plugin(database_plugin)
-                print("✅ Database plugin added")
+            if results:
+                loaded = sum(1 for success in results.values() if success)
+                failed = len(results) - loaded
+                print(f"✅ Plugin initialization complete: {loaded} loaded, {failed} failed")
                 
-            print(f"✅ Plugin system initialized with {len(self.plugin_manager.plugins)} plugins")
-            
-        except Exception as e:
-            print(f"❌ Error setting up plugins: {e}")
-            import traceback
-            traceback.print_exc()
-            self.plugin_manager = None
-
-    async def debug_all_events_callback(self, room: MatrixRoom, event: Event):
-        """Catch and log ALL events for debugging purposes"""
-        try:
-            event_type = type(event).__name__
-
-            # Skip our own messages and very frequent events
-            if event.sender == self.user_id:
-                return
-
-            # Log interesting events
-            if 'Message' in event_type or 'Media' in event_type or 'Encrypted' in event_type:
-                print(f"🔍 DEBUG - All Events: {event_type} from {event.sender}")
-                print(f"🔍 DEBUG - Event details: {event}")
-
-                if hasattr(event, 'content'):
-                    print(f"🔍 DEBUG - Event content: {event.content}")
-
-        except Exception as e:
-            print(f"❌ Error in debug_all_events_callback: {e}")
+                # Show available commands
+                commands = self.plugin_manager.get_all_commands()
+                if commands:
+                    print(f"📋 Available commands: {', '.join(commands.keys())}")
+            else:
+                print("⚠️ No plugins found in plugins directory")
 
     async def get_bot_display_name(self):
-        """Get the bot's current display name from Matrix (no fallback)"""
+        """Get the bot's current display name from Matrix"""
         try:
-            # Get the bot's profile from Matrix
+            print(f"🔍 Fetching display name for {self.user_id}")
             response = await self.client.get_displayname(self.user_id)
-            if hasattr(response, 'displayname') and response.displayname:
-                display_name = response.displayname.strip()
-                print(f"🤖 Bot display name retrieved: '{display_name}'")
-                return display_name
+            
+            if hasattr(response, 'displayname'):
+                if response.displayname:
+                    display_name = response.displayname.strip()
+                    print(f"🤖 Bot display name retrieved: '{display_name}'")
+                    return display_name
+                else:
+                    print(f"⚠️ Display name is empty for bot user {self.user_id}")
+                    return None
             else:
-                print(f"⚠️ No display name set for bot user {self.user_id}")
+                print(f"⚠️ Response has no displayname attribute")
                 return None
         except Exception as e:
             print(f"❌ Error getting display name: {e}")
             return None
 
-    async def update_command_prefix(self):
+    async def update_command_prefix(self, retry_count=3):
         """Update the command prefix based on current display name"""
-        try:
-            display_name = await self.get_bot_display_name()
-            if display_name:
-                # Store the display name and create command prefix with colon
-                self.current_display_name = display_name
-                print(f"✅ Bot display name updated to: '{self.current_display_name}'")
-                print(f"✅ Bot will respond to commands like: '{self.current_display_name}: help'")
-                return True
-            else:
-                print(f"❌ Could not retrieve display name - bot commands disabled")
-                self.current_display_name = None
-                return False
-        except Exception as e:
-            print(f"❌ Error updating command prefix: {e}")
-            self.current_display_name = None
-            return False
-
-    async def general_message_callback(self, room: MatrixRoom, event: RoomMessage):
-        """Catch all room messages to see what we might be missing"""
-        try:
-            # Skip our own messages
-            if event.sender == self.user_id:
-                return
-
-            event_type = type(event).__name__
-
-            print(f"🔍 GENERAL MESSAGE CALLBACK: {event_type}")
-            print(f"🔍   From: {event.sender}")
-            print(f"🔍   Event ID: {event.event_id}")
-            print(f"🔍   Encrypted: {event.decrypted}")
-
-            if hasattr(event, 'body'):
-                print(f"🔍   Body: {event.body}")
-
-            if hasattr(event, 'url'):
-                print(f"🔍   Media URL: {event.url}")
-
-            if hasattr(event, 'mimetype'):
-                print(f"🔍   MIME Type: {event.mimetype}")
-
-            # Store in database with generic handling
-            await self.store_message_in_db(
-                room_id=room.room_id,
-                event_id=event.event_id,
-                sender=event.sender,
-                message_type=event_type.lower().replace('roommessage', ''),
-                content=getattr(event, 'body', str(event)),
-                timestamp=datetime.fromtimestamp(event.server_timestamp / 1000)
-            )
-
-        except Exception as e:
-            print(f"❌ Error in general_message_callback: {e}")
-            import traceback
-            traceback.print_exc()
-
-    async def store_message_in_db(self, room_id, event_id, sender, message_type, content=None, timestamp=None):
-        """Store a message in the database (with error handling)"""
-        if not self.db_enabled or not self.db_client:
-            print(f"📁 Skipping DB storage - DB not enabled")
-            return None
-
-        try:
-            print(f"📁 Storing in DB: {message_type} from {sender}")
-
-            result = await self.db_client.store_message(
-                room_id=room_id,
-                event_id=event_id,
-                sender=sender,
-                message_type=message_type,
-                content=content,
-                timestamp=timestamp or datetime.now()
-            )
-
-            if result:
-                print(f"📁 ✅ Stored message in database: ID {result.get('id', 'unknown')}")
-            else:
-                print("⚠️ Failed to store message in database")
-
-            return result
-
-        except Exception as e:
-            print(f"❌ Database storage error: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
-
-
+        for attempt in range(retry_count):
+            try:
+                display_name = await self.get_bot_display_name()
+                if display_name:
+                    self.current_display_name = display_name
+                    print(f"✅ Bot display name updated to: '{self.current_display_name}'")
+                    return True
+                else:
+                    if attempt < retry_count - 1:
+                        print(f"⚠️ Could not retrieve display name (attempt {attempt + 1}/{retry_count}), retrying...")
+                        await asyncio.sleep(1)  # Wait 1 second before retry
+                        continue
+                    else:
+                        print(f"❌ Could not retrieve display name after {retry_count} attempts")
+                        self.current_display_name = None
+                        return False
+            except Exception as e:
+                if attempt < retry_count - 1:
+                    print(f"❌ Error updating command prefix (attempt {attempt + 1}/{retry_count}): {e}, retrying...")
+                    await asyncio.sleep(1)
+                    continue
+                else:
+                    print(f"❌ Error updating command prefix after {retry_count} attempts: {e}")
+                    self.current_display_name = None
+                    return False
+        return False
 
     async def text_message_callback(self, room: MatrixRoom, event: RoomMessageText):
-        """Handle incoming text messages and edits"""
+        """Handle incoming text messages"""
         try:
             self.event_counters['text_messages'] += 1
 
@@ -515,283 +250,132 @@ class DebugMatrixBot:
             print(f"📨   Room: {room.name}")
             print(f"📨   From: {event.sender}")
             print(f"📨   Content: {event.body}")
-            print(f"📨   Encrypted: {event.decrypted}")
-
-            # Store incoming message in database
-            await self.store_message_in_db(
-                room_id=room.room_id,
-                event_id=event.event_id,
-                sender=event.sender,
-                message_type="text",
-                content=event.body,
-                timestamp=datetime.fromtimestamp(event.server_timestamp / 1000)
-            )
 
             # Ignore our own messages
             if event.sender == self.user_id:
                 return
 
-            # Check if this is an edit - use both relates_to property and "* " prefix
-            is_edit = (hasattr(event, 'relates_to') and event.relates_to) or event.body.startswith("* ")
-
-            # Handle both original messages and edits
-            message_body = event.body
-
-            # Update command prefix periodically or on first run
+            # Update command prefix periodically
             current_time = datetime.now()
             if (self.last_name_check is None or
-                (current_time - self.last_name_check).seconds > 15):  # Check every 5 minutes
+                (current_time - self.last_name_check).seconds > 300):  # Check every 5 minutes
                 await self.update_command_prefix()
                 self.last_name_check = current_time
-    
+
             # Only process commands if we have a valid display name
             if not self.current_display_name:
-                print(f"🚫 Ignoring message - no valid display name set")
-                return
-    
-            # Handle edit formatting - Matrix often prefixes edits with "* "
-            # We need to check for bot commands in both the original and cleaned message
-            original_message = message_body
-            cleaned_message = message_body
-            
-            if message_body.startswith("* "):
-                cleaned_message = message_body[2:].strip()
-                print(f"🔍 Detected edit prefix, cleaned message: '{cleaned_message}'")
-    
-            # Check for bot commands using display name with colon format
-            # Try both the original message and cleaned message for edits
-            expected_prefix = f"{self.current_display_name.lower()}:"
-            print(f"🔍 Looking for command prefix: '{expected_prefix}'")
-            
-            # Check cleaned message first (for edits)
-            cleaned_lower = cleaned_message.lower().strip()
-            original_lower = original_message.lower().strip()
-            
-            print(f"🔍 Cleaned message lower: '{cleaned_lower}'")
-            print(f"🔍 Original message lower: '{original_lower}'")
-            
-            command_found = False
-            command_to_process = None
-            
-            if cleaned_lower.startswith(expected_prefix):
-                command_found = True
-                command_to_process = cleaned_message
-                print(f"🔍 Command found in cleaned message: '{command_to_process}'")
-            elif original_lower.startswith(expected_prefix):
-                command_found = True
-                command_to_process = original_message
-                print(f"🔍 Command found in original message: '{command_to_process}'")
-            
-            if command_found:
-                if is_edit:
-                    print(f"🤖 Responding to edited command with '{self.current_display_name}:': {command_to_process}")
-                else:
-                    print(f"🤖 Responding to command with '{self.current_display_name}:': {command_to_process}")
-                await self.handle_bot_command(room, event, command_to_process)
-            else:
-                print(f"🔍 No command found. Expected: '{expected_prefix}', cleaned: '{cleaned_lower}', original: '{original_lower}'")
+                print(f"🚫 No display name set, attempting to retrieve it...")
+                # Try to update display name once more
+                success = await self.update_command_prefix(retry_count=1)
+                if not success:
+                    print(f"🚫 Still no display name available, ignoring message")
+                    return
+
+            # Handle bot commands
+            await self.handle_command(room, event)
 
         except Exception as e:
             print(f"❌ Error in text message callback: {e}")
-            import traceback
-            traceback.print_exc()
 
-    async def media_message_callback_wrapper(self, room: MatrixRoom, event):
-        """Wrapper for regular media messages to delegate to media processor"""
+    async def handle_command(self, room: MatrixRoom, event: RoomMessageText):
+        """Handle bot commands using plugin system"""
         try:
-            self.event_counters['media_messages'] += 1
-
-            # Ignore our own messages
-            if event.sender == self.user_id:
-                print(f"📎 Ignoring our own media message")
+            message = event.body.strip()
+            
+            # Check if this is an edit
+            is_edit = (hasattr(event, 'relates_to') and event.relates_to) or message.startswith("* ")
+            edit_prefix = "✏️ " if is_edit else ""
+            
+            # Clean edit prefix if present
+            if message.startswith("* "):
+                message = message[2:].strip()
+            
+            # Check for bot command format: "botname: command args"
+            expected_prefix = f"{self.current_display_name.lower()}:"
+            message_lower = message.lower()
+            
+            if not message_lower.startswith(expected_prefix):
+                return  # Not a command for this bot
+            
+            # Extract command and args
+            command_part = message[len(expected_prefix):].strip()
+            if not command_part:
+                await self.send_message(room.room_id, f"{edit_prefix}Please specify a command. Try '{self.current_display_name}: help'")
                 return
-
-            # Use media processor if available
-            if self.media_processor:
-                await self.media_processor.handle_media_message(
-                    room, event,
-                    store_message_func=self.store_message_in_db,
-                    db_client=self.db_client if self.db_enabled else None,
-                    client=self.client
+            
+            # Split into command and arguments
+            parts = command_part.split(" ", 1)
+            command = parts[0].lower()
+            args = parts[1] if len(parts) > 1 else ""
+            
+            print(f"🤖 Processing command: {command} with args: {args}")
+            
+            # Try to handle with plugin system
+            if self.plugin_manager:
+                response = await self.plugin_manager.handle_command(
+                    command, args, room.room_id, event.sender, self
                 )
-            else:
-                print(f"⚠️ Media processor not available, skipping media processing")
+                
+                if response:
+                    await self.send_message(room.room_id, f"{edit_prefix}{response}")
+                    return
+            
+            # No plugin handled the command
+            await self.send_message(room.room_id, f"{edit_prefix}Unknown command: {command}")
 
         except Exception as e:
-            print(f"❌ Error in media message callback wrapper: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ Error handling command: {e}")
 
-    async def encrypted_media_message_callback(self, room: MatrixRoom, event):
-        """Handle incoming ENCRYPTED media messages"""
+    async def media_message_callback(self, room: MatrixRoom, event):
+        """Handle regular media messages"""
         try:
             self.event_counters['media_messages'] += 1
-
-            # Ignore our own messages
+            
             if event.sender == self.user_id:
-                print(f"📎🔐 Ignoring our own encrypted media message")
-                return
-
-            # Use media processor if available
-            if self.media_processor:
-                await self.media_processor.handle_encrypted_media_message(
-                    room, event, 
-                    store_message_func=self.store_message_in_db,
-                    db_client=self.db_client if self.db_enabled else None,
-                    client=self.client
-                )
-            else:
-                print(f"⚠️ Media processor not available, skipping encrypted media processing")
-
-
+                return  # Ignore our own messages
+            
+            print(f"📎 MEDIA MESSAGE #{self.event_counters['media_messages']}")
+            print(f"📎   Type: {type(event).__name__}")
+            print(f"📎   From: {event.sender}")
+            
+            # Let plugins handle media if they want to
+            # (This could be extended to call media-handling plugins)
+            
         except Exception as e:
-            print(f"❌ Error in encrypted media message callback: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ Error in media message callback: {e}")
 
+    async def encrypted_media_callback(self, room: MatrixRoom, event):
+        """Handle encrypted media messages"""
+        try:
+            self.event_counters['encrypted_events'] += 1
+            
+            if event.sender == self.user_id:
+                return
+            
+            print(f"📎🔐 ENCRYPTED MEDIA MESSAGE #{self.event_counters['encrypted_events']}")
+            print(f"📎🔐   Type: {type(event).__name__}")
+            print(f"📎🔐   From: {event.sender}")
+            
+        except Exception as e:
+            print(f"❌ Error in encrypted media callback: {e}")
+
+    async def general_message_callback(self, room: MatrixRoom, event: RoomMessage):
+        """Catch-all for messages"""
+        if event.sender == self.user_id:
+            return
+        
+        # This is where you could add general message logging to database
+        # if you had a database plugin loaded
 
     async def decryption_failure_callback(self, room: MatrixRoom, event: MegolmEvent):
-        """Handle decryption failures by requesting keys"""
+        """Handle decryption failures"""
         self.event_counters['decryption_failures'] += 1
         print(f"🔓 DECRYPTION FAILURE #{self.event_counters['decryption_failures']}")
-        print(f"🔓   Room: {room.name}")
-        print(f"🔓   From: {event.sender}")
-        print(f"🔓   Session ID: {event.session_id}")
-
-        # Request missing keys
+        
         try:
             await self.client.request_room_key(event)
-            print(f"🔑 Requested room key for session {event.session_id}")
         except Exception as e:
             print(f"❌ Failed to request room key: {e}")
-
-    async def handle_bot_command(self, room: MatrixRoom, event, command_text=None):
-        """Handle bot commands with dynamic prefix and colon format"""
-        try:
-            command = command_text if command_text is not None else event.body.strip()
-            command_lower = command.lower()
-
-            is_edit = hasattr(event, 'relates_to') and event.relates_to
-            edit_prefix = "[EDIT] " if is_edit else ""
-
-            print(f"🤖 Processing command: {command}")
-
-            # Skip processing if no display name is set
-            if not self.current_display_name:
-                await self.send_message(room.room_id, f"{edit_prefix}❌ Bot display name not configured. Please set a display name in Matrix.")
-                return
-
-            # Create the current command prefix for matching (with colon)
-            prefix = f"{self.current_display_name.lower()}:"
-            
-            # Helper function to check if command matches a pattern
-            def matches_command(pattern):
-                expected = f"{prefix} {pattern}".strip()
-                return command_lower == expected or command_lower.startswith(expected + " ")
-            
-            def matches_exact(pattern):
-                expected = f"{prefix} {pattern}".strip()
-                return command_lower == expected
-
-            # Try plugin system first
-            command_handled = False
-            if self.plugin_manager:
-                # Extract command and args from the command text
-                # Use lowercase version for command detection, but preserve original case for arguments
-                if command_lower.startswith(prefix):
-                    # Remove prefix from original command to preserve case in arguments
-                    remaining_command = command[len(prefix):].strip()
-                    command_parts = remaining_command.split(" ", 1)
-                    if command_parts:
-                        base_command = command_parts[0].lower()  # Command itself should be lowercase for matching
-                        args = command_parts[1] if len(command_parts) > 1 else ""  # Args preserve original case
-                    
-                        # Try to handle with plugin system
-                        response = await self.plugin_manager.handle_command(
-                            base_command, args, room.room_id, event.sender
-                        )
-                        
-                        if response:
-                            await self.send_message(room.room_id, f"{edit_prefix}{response}")
-                            command_handled = True
-                        else:
-                            pass
-
-            # Fallback for unknown commands
-            if not command_handled:
-                unknown_msg = f"{edit_prefix}Unknown command. Try '{self.current_display_name}: help' or '{self.current_display_name}: debug'"
-                await self.send_message(room.room_id, unknown_msg)
-
-        except Exception as e:
-            print(f"❌ Error handling bot command: {e}")
-            import traceback
-            traceback.print_exc()
-
-
-
-
-
-
-
-
-
-
-    async def handle_db_health_check(self, room_id, is_edit=False):
-        """Handle database health check command"""
-        edit_prefix = "✏️ " if is_edit else ""
-
-        if not self.db_enabled:
-            await self.send_message(room_id, f"{edit_prefix}❌ Database is not enabled. Check your DATABASE_API_URL and DATABASE_API_KEY environment variables.")
-            return
-
-        try:
-            await self.send_message(room_id, f"{edit_prefix}🏥 Checking database health...")
-
-            is_healthy = await self.db_client.health_check()
-
-            if is_healthy:
-                await self.send_message(room_id, f"{edit_prefix}✅ **Database Health: HEALTHY**\n📊 API is responding normally")
-            else:
-                await self.send_message(room_id, f"{edit_prefix}❌ **Database Health: UNHEALTHY**\n🚨 API is not responding or having issues")
-
-        except Exception as e:
-            print(f"❌ Database health check error: {e}")
-            await self.send_message(room_id, f"{edit_prefix}💥 **Database Health Check Failed**\n❌ Error: {str(e)}")
-
-    async def handle_db_stats(self, room_id, is_edit=False):
-        """Handle database statistics command"""
-        edit_prefix = "✏️ " if is_edit else ""
-
-        if not self.db_enabled:
-            await self.send_message(room_id, f"{edit_prefix}❌ Database is not enabled.")
-            return
-
-        try:
-            await self.send_message(room_id, f"{edit_prefix}📊 Fetching database statistics...")
-
-            stats = await self.db_client.get_database_stats()
-
-            if stats:
-                stats_text = f"""{edit_prefix}📈 **Database Statistics**
-
-📝 **Messages:** {stats.get('total_messages', 'Unknown')}
-📁 **Media Files:** {stats.get('total_media_files', 'Unknown')}
-💾 **Size:** {stats.get('total_size_mb', 0):.2f} MB
-🕐 **Updated:** {stats.get('updated_at', 'Unknown')}
-
-🔍 **Bot Counters:**
-• Text: {self.event_counters['text_messages']}
-• Media: {self.event_counters['media_messages']}
-• Decrypt fails: {self.event_counters['decryption_failures']}
-"""
-
-                await self.send_message(room_id, stats_text)
-            else:
-                await self.send_message(room_id, f"{edit_prefix}❌ Failed to retrieve database statistics")
-
-        except Exception as e:
-            print(f"❌ Database stats error: {e}")
-            await self.send_message(room_id, f"{edit_prefix}💥 **Database Stats Failed**\n❌ Error: {str(e)}")
 
     async def send_message(self, room_id, message):
         """Send a message to a room"""
@@ -805,47 +389,205 @@ class DebugMatrixBot:
                 },
                 ignore_unverified_devices=True
             )
-
-            # Store our outgoing message in database
-            if hasattr(response, 'event_id'):
-                await self.store_message_in_db(
+            print(f"📤 Message sent: {message[:50]}{'...' if len(message) > 50 else ''}")
+            
+            # Store message in database if enabled
+            if self.db_enabled and self.db_client and hasattr(response, 'event_id'):
+                await self.db_client.store_message(
                     room_id=room_id,
                     event_id=response.event_id,
                     sender=self.user_id,
                     message_type="text",
                     content=message,
-                    timestamp=datetime.now()
+                    timestamp=datetime.now().isoformat()
                 )
-
-            print(f"📤 Message sent: {message[:50]}{'...' if len(message) > 50 else ''}")
         except Exception as e:
             print(f"❌ Failed to send message: {e}")
+    
+    async def send_file(self, room_id, file_path, filename=None, mimetype=None):
+        """Send a file to a room"""
+        try:
+            if not filename:
+                filename = os.path.basename(file_path)
+            
+            if not mimetype:
+                # Simple mimetype detection
+                if filename.lower().endswith('.txt'):
+                    mimetype = "text/plain"
+                elif filename.lower().endswith('.json'):
+                    mimetype = "application/json"
+                else:
+                    mimetype = "application/octet-stream"
+            
+            print(f"📎 Uploading file: {filename}")
+            
+            # Read file and upload to Matrix
+            with open(file_path, 'rb') as f:
+                file_data = f.read()
+                file_size = len(file_data)
+            
+            # Upload file to Matrix content repository
+            upload_response = await self.client.upload(
+                data_provider=lambda: file_data,
+                content_type=mimetype,
+                filename=filename,
+                filesize=file_size
+            )
+            
+            if hasattr(upload_response, 'content_uri'):
+                # Send file message
+                content = {
+                    "msgtype": "m.file",
+                    "body": filename,
+                    "filename": filename,
+                    "info": {
+                        "size": file_size,
+                        "mimetype": mimetype
+                    },
+                    "url": upload_response.content_uri
+                }
+                
+                response = await self.client.room_send(
+                    room_id=room_id,
+                    message_type="m.room.message",
+                    content=content,
+                    ignore_unverified_devices=True
+                )
+                
+                print(f"✅ File sent successfully: {filename}")
+                return True
+            else:
+                print(f"❌ Failed to upload file: {upload_response}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Failed to send file: {e}")
+            return False
+    
+    async def handle_bot_command(self, room, event, command_text):
+        """Handle bot commands (deprecated, but kept for test compatibility)"""
+        try:
+            # Extract command from command_text
+            if ":" in command_text:
+                parts = command_text.split(":", 1)
+                if len(parts) > 1:
+                    command_part = parts[1].strip()
+                    command_words = command_part.split()
+                    if command_words:
+                        command = command_words[0].lower()
+                        
+                        if command == "debug":
+                            debug_info = f"""🔧 **DEBUG INFO**
+Room: {room.name or 'Unknown'} ({room.room_id})
+Encrypted: {room.encrypted}
+Users: {len(room.users)}
+Bot Display Name: {self.current_display_name}"""
+                            await self.client.room_send(
+                                room_id=room.room_id,
+                                message_type="m.room.message",
+                                content={"msgtype": "m.text", "body": debug_info},
+                                ignore_unverified_devices=True
+                            )
+                        elif command == "talk":
+                            await self.client.room_send(
+                                room_id=room.room_id,
+                                message_type="m.room.message",
+                                content={"msgtype": "m.text", "body": "Hello! 👋 I'm your friendly Matrix bot. How can I help you today?"},
+                                ignore_unverified_devices=True
+                            )
+                        else:
+                            await self.client.room_send(
+                                room_id=room.room_id,
+                                message_type="m.room.message",
+                                content={"msgtype": "m.text", "body": "Unknown command. Try 'boo: help' or 'boo: debug'"},
+                                ignore_unverified_devices=True
+                            )
+        except Exception as e:
+            print(f"❌ Error in handle_bot_command: {e}")
+    
+    async def store_message_in_db(self, room_id, event_id, sender, message_type, content):
+        """Store a message in the database"""
+        if not self.db_enabled or not self.db_client:
+            return None
+        
+        try:
+            return await self.db_client.store_message(
+                room_id=room_id,
+                event_id=event_id,
+                sender=sender,
+                message_type=message_type,
+                content=content,
+                timestamp=datetime.now().isoformat()
+            )
+        except Exception as e:
+            print(f"❌ Error storing message in DB: {e}")
+            return None
+    
+    async def handle_db_health_check(self, room_id):
+        """Handle database health check"""
+        if not self.db_client:
+            return
+        
+        try:
+            is_healthy = await self.db_client.health_check()
+            status = "HEALTHY" if is_healthy else "UNHEALTHY"
+            message = f"🏥 Database Health: {status}"
+            
+            await self.client.room_send(
+                room_id=room_id,
+                message_type="m.room.message",
+                content={"msgtype": "m.text", "body": message},
+                ignore_unverified_devices=True
+            )
+        except Exception as e:
+            print(f"❌ Error in handle_db_health_check: {e}")
+    
+    async def handle_db_stats(self, room_id):
+        """Handle database statistics"""
+        if not self.db_client:
+            return
+        
+        try:
+            stats = await self.db_client.get_database_stats()
+            if stats:
+                message = f"""📊 **Database Statistics**
 
+📝 **Messages:** {stats.get('total_messages', 0)}
+📁 **Media Files:** {stats.get('total_media_files', 0)}
+💾 **Size:** {stats.get('total_size_mb', 0):.2f} MB
+🕒 **Updated:** {stats.get('updated_at', 'Unknown')}"""
+            else:
+                message = "❌ Failed to retrieve database statistics"
+            
+            await self.client.room_send(
+                room_id=room_id,
+                message_type="m.room.message",
+                content={"msgtype": "m.text", "body": message},
+                ignore_unverified_devices=True
+            )
+        except Exception as e:
+            print(f"❌ Error in handle_db_stats: {e}")
 
-
+    # Standard Matrix bot methods (login, join_room, etc.)
     async def login(self):
         """Login to Matrix server"""
         print("🔐 Attempting to login to Matrix server...")
         try:
             response = await self.client.login(self.password, device_name=self.device_name)
-
+            
             if isinstance(response, LoginResponse):
                 print(f"✅ Logged in as {self.user_id}")
-                print(f"   Device ID: {response.device_id}")
-                print(f"   Access Token: {response.access_token[:20]}...")
-
-                # Update command prefix after successful login
+                
+                # Update command prefix after login - with delay to allow sync
+                print("⏳ Waiting 2 seconds for Matrix sync before getting display name...")
+                await asyncio.sleep(2)
                 await self.update_command_prefix()
-                if self.current_display_name:
-                    print(f"🤖 Bot will respond to commands like: '{self.current_display_name}: help'")
-
+                
                 if self.client.olm:
-                    self.client.olm.account.generate_one_time_keys(1)
                     print("✅ Encryption enabled and ready")
                     self.client.blacklist_device = lambda device: False
-                    print("✅ Device verification disabled for bot operation")
                     await self.setup_encryption_keys()
-
+                
                 return True
             else:
                 print(f"❌ Login failed: {response}")
@@ -870,42 +612,17 @@ class DebugMatrixBot:
             return False
 
     async def setup_encryption_keys(self):
-        """Set up encryption keys and trust devices"""
+        """Set up encryption keys"""
         try:
             await self.client.keys_upload()
-            print("✅ Uploaded encryption keys")
-
             response = await self.client.keys_query()
             if isinstance(response, KeysQueryResponse):
-                print("✅ Queried device keys for other users")
-
                 for user_id, devices in response.device_keys.items():
                     for device_id, device_key in devices.items():
                         self.client.verify_device(device_key)
-                        print(f"✅ Trusted device {device_id} for user {user_id}")
-
+            print("✅ Encryption keys set up")
         except Exception as e:
             print(f"❌ Error setting up encryption keys: {e}")
-
-    async def trust_all_room_devices(self, room_id):
-        """Trust all devices in a specific room"""
-        try:
-            room = self.client.rooms.get(room_id)
-            if not room:
-                return
-
-            user_ids = list(room.users.keys())
-            if user_ids:
-                response = await self.client.keys_query(user_ids)
-                if isinstance(response, KeysQueryResponse):
-                    for user_id, devices in response.device_keys.items():
-                        for device_id, device_key in devices.items():
-                            self.client.verify_device(device_key)
-                            print(f"✅ Trusted device {device_id} for user {user_id}")
-
-                    print(f"✅ Trusted all devices in room {room.name}")
-        except Exception as e:
-            print(f"❌ Error trusting room devices: {e}")
 
     async def sync_forever(self):
         """Keep syncing with the server"""
@@ -919,22 +636,21 @@ class DebugMatrixBot:
     async def close(self):
         """Close the client connection"""
         try:
+            if self.plugin_manager:
+                # Clean up plugins
+                await self.plugin_manager.cleanup()
+            
             await self.client.close()
             print("✅ Client connection closed")
         except Exception as e:
             print(f"❌ Error closing client: {e}")
 
+# Clean main function
 async def main():
-    print("🔧 Starting SIMPLIFIED main function...")
+    print("🔧 Starting clean Matrix bot...")
 
-    try:
-        load_dotenv()
-        print("✅ Environment variables loaded")
-    except Exception as e:
-        print(f"❌ Failed to load .env file: {e}")
-
-    print(f"📁 Current working directory: {os.getcwd()}")
-    print(f"📄 .env file exists: {os.path.exists('.env')}")
+    # Load environment
+    load_dotenv()
 
     # Configuration
     HOMESERVER = os.getenv("HOMESERVER", "https://matrix.org")
@@ -942,62 +658,50 @@ async def main():
     PASSWORD = os.getenv("PASSWORD")
     ROOM_ID = os.getenv("ROOM_ID")
 
-    print(f"\n📋 Configuration:")
-    print(f"  HOMESERVER: {HOMESERVER}")
-    print(f"  USER_ID: {USER_ID}")
-    print(f"  PASSWORD: {'*' * len(PASSWORD) if PASSWORD else None}")
-    print(f"  ROOM_ID: {ROOM_ID}")
-    print(f"  DATABASE_API_URL: {os.getenv('DATABASE_API_URL', 'Not set')}")
-    print(f"  DATABASE_API_KEY: {'*' * 10 if os.getenv('DATABASE_API_KEY') else 'Not set'}")
-    print(f"  OPENROUTER_API_KEY: {'*' * 10 if os.getenv('OPENROUTER_API_KEY') else 'Not set'}")
-
     if not USER_ID or not PASSWORD or not ROOM_ID:
         print("❌ Error: Missing required environment variables")
         return
 
-    print(f"\n🚀 Starting SIMPLIFIED bot for user: {USER_ID}")
-
     try:
-        bot = DebugMatrixBot(HOMESERVER, USER_ID, PASSWORD)
+        # Create bot
+        bot = CleanMatrixBot(HOMESERVER, USER_ID, PASSWORD)
         print("✅ Bot instance created successfully")
-    except Exception as e:
-        print(f"❌ Failed to create bot instance: {e}")
-        return
 
-    try:
+        # Login
         if await bot.login():
             print("✅ Login successful")
 
+            # Initialize plugins AFTER login
+            await bot.initialize_plugins()
+
+            # Join room
             if await bot.join_room(ROOM_ID):
                 print("✅ Room joined successfully")
 
-                # Trust devices in the room
-                await bot.trust_all_room_devices(ROOM_ID)
-
                 # Send startup message
-                startup_msg = f"""🔍 **Matrix Bot Started!**
+                plugin_info = ""
+                if bot.plugin_manager:
+                    status = bot.plugin_manager.get_plugin_status()
+                    plugin_info = f"• Plugins: {status['total_loaded']} loaded, {status['total_failed']} failed"
+                    if status.get('hot_reloading'):
+                        plugin_info += " (🔥 Hot reloading active)"
+                
+                startup_msg = f"""🔍 **Clean Matrix Bot Started!**
 
 🤖 **Available Commands:**
-Type `boo help` for full command list
+Type `{bot.current_display_name}: help` for commands
 
-🔧 **Debug Info:**
-• Database: {'✅ Enabled' if bot.db_enabled else '❌ Disabled'}
+🔧 **Status:**
+• Plugin System: {'✅ Active' if bot.plugin_manager else '❌ Disabled'}
+{plugin_info}
 • Encryption: {'✅ Ready' if bot.client.olm else '❌ Disabled'}
-• Media Processing: ✅ Enhanced decryption with MIME preservation
-• YouTube Q&A: ✅ Room-specific transcript caching
-• Version: Simplified with YouTube Q&A functionality
 
-Ready to process encrypted media and provide quantum-enhanced responses! 🚀"""
+Ready and clean! 🚀"""
 
                 await bot.send_message(ROOM_ID, startup_msg)
+                print("🎉 Clean bot ready and running!")
 
-                print(f"\n🎉 Simplified bot ready and running!")
-                print(f"📊 Event counters will be displayed as messages are processed")
-                print(f"🔓 Enhanced encrypted media decryption ready")
-                print(f"📁 Database integration: {'✅ Active' if bot.db_enabled else '❌ Disabled'}")
-                print(f"🎬 YouTube Q&A: ✅ Room-specific caching enabled")
-
-                # Start the sync loop
+                # Start sync loop
                 await bot.sync_forever()
             else:
                 print("❌ Failed to join room")
@@ -1005,25 +709,18 @@ Ready to process encrypted media and provide quantum-enhanced responses! 🚀"""
             print("❌ Login failed")
 
     except KeyboardInterrupt:
-        print("\n🛑 Received interrupt signal - shutting down gracefully...")
+        print("\n🛑 Shutdown requested...")
     except Exception as e:
         print(f"❌ Bot error: {e}")
-        import traceback
-        traceback.print_exc()
     finally:
-        print("🧹 Cleaning up...")
-        await bot.close()
+        if 'bot' in locals():
+            await bot.close()
         print("✅ Cleanup complete")
 
 if __name__ == "__main__":
-    print("🎬 Starting SIMPLIFIED Matrix Bot with Enhanced Features...")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n👋 Bot shutdown requested by user")
+        print("\n👋 Bot shutdown")
     except Exception as e:
         print(f"❌ Fatal error: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        print("🔚 Simplified Bot stopped")

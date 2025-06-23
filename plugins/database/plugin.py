@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from plugins.plugin_interface import BotPlugin
+from config import BotConfig
 
 
 class ChatDatabaseClient:
@@ -221,9 +222,56 @@ class DatabasePlugin(BotPlugin):
     async def initialize(self, bot_instance) -> bool:
         """Initialize plugin with bot instance"""
         self.bot = bot_instance
-        # Only enable if database is available
-        self.enabled = bot_instance and getattr(bot_instance, 'db_enabled', False)
-        self.logger.info("Database plugin initialized successfully")
+        
+        # Get database configuration from plugin config and environment
+        try:
+            config = BotConfig()
+            plugin_config = config.get_plugin_config("database")
+            
+            # Get URL from plugin config, API key from environment
+            api_url = plugin_config.get("api_url")
+            api_key = config.database_api_key  # From .env file
+            
+            if not api_url:
+                self.logger.warning("Database API URL not configured in plugins.yaml - database features disabled")
+                self.logger.warning("Please add 'api_url' to database config in plugins.yaml")
+                self.enabled = False
+                bot_instance.db_enabled = False
+                bot_instance.db_client = None
+                return True
+                
+            if not api_key:
+                self.logger.warning("Database API key not configured in .env - database features disabled")
+                self.logger.warning("Please set DATABASE_API_KEY in .env file")
+                self.enabled = False
+                bot_instance.db_enabled = False
+                bot_instance.db_client = None
+                return True
+            
+            # Create database client
+            self.logger.info(f"Initializing database client for: {api_url}")
+            bot_instance.db_client = ChatDatabaseClient(api_url, api_key)
+            
+            # Test connection
+            self.logger.info("Testing database connection...")
+            is_healthy = await bot_instance.db_client.health_check()
+            
+            if is_healthy:
+                bot_instance.db_enabled = True
+                self.enabled = True
+                self.logger.info("✅ Database client initialized and connected successfully")
+            else:
+                self.logger.error("❌ Database health check failed - database features disabled")
+                self.enabled = False
+                bot_instance.db_enabled = False
+                bot_instance.db_client = None
+                
+        except Exception as e:
+            self.logger.error(f"❌ Failed to initialize database client: {e}")
+            self.enabled = False
+            bot_instance.db_enabled = False
+            bot_instance.db_client = None
+        
         return True
     
     def get_commands(self) -> List[str]:
@@ -240,10 +288,10 @@ class DatabasePlugin(BotPlugin):
             if command == "db":
                 if args == "health":
                     return await self._handle_db_health()
-                elif args == "stats":
+                elif args == "stats" or args == "status":
                     return await self._handle_db_stats()
                 else:
-                    return "❌ Unknown database command. Use 'db health' or 'db stats'"
+                    return "❌ Unknown database command. Use 'db health', 'db stats', or 'db status'"
         except Exception as e:
             self.logger.error(f"Error handling {command} command from {user_id}: {str(e)}", exc_info=True)
             return f"❌ Error processing database command"

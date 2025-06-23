@@ -7,7 +7,7 @@ youtube:
 ai:
   enabled: true
   config:
-    model: "cognitivecomputations/dolphin3.0-mistral-24b:free"
+    model: "deepseek/deepseek-chat-v3-0324:free" #"cognitivecomputations/dolphin3.0-mistral-24b:free"
     temperature: 0.3
     max_tokens: 500
 
@@ -20,6 +20,7 @@ media:
 database:
   enabled: true
   config:
+    api_url: "https://base2.fungus.work"
     timeout: 30
 
 core:

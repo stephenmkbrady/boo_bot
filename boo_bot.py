@@ -337,12 +337,94 @@ class CleanMatrixBot:
             print(f"📎 MEDIA MESSAGE #{self.event_counters['media_messages']}")
             print(f"📎   Type: {type(event).__name__}")
             print(f"📎   From: {event.sender}")
+            print(f"📎   Content: {getattr(event, 'body', 'No body')}")
             
-            # Let plugins handle media if they want to
-            # (This could be extended to call media-handling plugins)
+            # Store media message in database if enabled
+            if self.db_enabled and self.db_client:
+                await self._store_media_message(room, event)
             
         except Exception as e:
             print(f"❌ Error in media message callback: {e}")
+
+    async def _store_media_message(self, room: MatrixRoom, event):
+        """Store media message in database"""
+        try:
+            # Determine message type based on event type
+            event_type_name = type(event).__name__
+            if 'Image' in event_type_name:
+                message_type = 'image'
+            elif 'Video' in event_type_name:
+                message_type = 'video'
+            elif 'Audio' in event_type_name:
+                message_type = 'audio'
+            elif 'File' in event_type_name:
+                message_type = 'file'
+            else:
+                message_type = 'media'
+            
+            # Get message content/filename
+            content = getattr(event, 'body', f"Media file: {getattr(event, 'url', 'unknown')}")
+            
+            print(f"💾 Storing {message_type} message in database...")
+            
+            # Store message record first
+            result = await self.db_client.store_message(
+                room_id=room.room_id,
+                event_id=event.event_id,
+                sender=event.sender,
+                message_type=message_type,
+                content=content,
+                timestamp=datetime.now()
+            )
+            
+            if result and 'id' in result:
+                message_id = result['id']
+                print(f"✅ Media message stored with ID: {message_id}")
+                
+                # Download and upload the actual media file
+                try:
+                    if hasattr(event, 'url') and event.url:
+                        print(f"📥 Downloading media from Matrix: {event.url}")
+                        
+                        # Download media from Matrix
+                        response = await self.client.download(event.url)
+                        if hasattr(response, 'body') and response.body:
+                            # Create a temporary file with the media content
+                            import tempfile
+                            import os
+                            
+                            # Get file extension from event body (filename)
+                            filename = getattr(event, 'body', 'media_file')
+                            file_ext = os.path.splitext(filename)[1] if '.' in filename else ''
+                            
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
+                                temp_file.write(response.body)
+                                temp_file_path = temp_file.name
+                            
+                            print(f"📤 Uploading media to database...")
+                            
+                            # Upload to database
+                            upload_result = await self.db_client.upload_media(message_id, temp_file_path)
+                            
+                            # Clean up temp file
+                            os.unlink(temp_file_path)
+                            
+                            if upload_result:
+                                print(f"✅ Media uploaded successfully: {upload_result.get('filename', 'unknown')}")
+                            else:
+                                print(f"❌ Failed to upload media to database")
+                        else:
+                            print(f"❌ Failed to download media from Matrix")
+                    else:
+                        print(f"⚠️ No media URL found in event")
+                except Exception as upload_error:
+                    print(f"❌ Error downloading/uploading media: {upload_error}")
+                
+            else:
+                print(f"❌ Failed to store media message in database")
+                
+        except Exception as e:
+            print(f"❌ Error storing media message: {e}")
 
     async def encrypted_media_callback(self, room: MatrixRoom, event):
         """Handle encrypted media messages"""
@@ -355,6 +437,11 @@ class CleanMatrixBot:
             print(f"📎🔐 ENCRYPTED MEDIA MESSAGE #{self.event_counters['encrypted_events']}")
             print(f"📎🔐   Type: {type(event).__name__}")
             print(f"📎🔐   From: {event.sender}")
+            print(f"📎🔐   Content: {getattr(event, 'body', 'Encrypted media')}")
+            
+            # Store encrypted media message in database if enabled
+            if self.db_enabled and self.db_client:
+                await self._store_media_message(room, event)
             
         except Exception as e:
             print(f"❌ Error in encrypted media callback: {e}")
@@ -399,7 +486,7 @@ class CleanMatrixBot:
                     sender=self.user_id,
                     message_type="text",
                     content=message,
-                    timestamp=datetime.now().isoformat()
+                    timestamp=datetime.now()
                 )
         except Exception as e:
             print(f"❌ Failed to send message: {e}")
@@ -536,7 +623,7 @@ Bot Display Name: {self.current_display_name}"""
                 sender=sender,
                 message_type=message_type,
                 content=content,
-                timestamp=datetime.now().isoformat()
+                timestamp=datetime.now()
             )
         except Exception as e:
             print(f"❌ Error storing message in DB: {e}")

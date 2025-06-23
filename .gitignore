@@ -30,9 +30,14 @@ yarn-error.log*
 
 .env 
 
-kjv.txt
+
 bot_store/*
 old/
+
+# copilot 
+CLAUDE.md
+ISSUES.md
+tasks.md
 
 # Python
 __pycache__/

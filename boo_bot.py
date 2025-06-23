@@ -421,6 +421,11 @@ class CleanMatrixBot:
             
             print(f"📎 Uploading file: {filename}")
             
+            # Check if file exists
+            if not os.path.exists(file_path):
+                print(f"❌ File does not exist: {file_path}")
+                return False
+            
             # Read file and upload to Matrix
             with open(file_path, 'rb') as f:
                 file_data = f.read()
@@ -428,13 +433,21 @@ class CleanMatrixBot:
             
             # Upload file to Matrix content repository
             upload_response = await self.client.upload(
-                data_provider=lambda: file_data,
+                data_provider=lambda *args: file_data,
                 content_type=mimetype,
                 filename=filename,
                 filesize=file_size
             )
             
-            if hasattr(upload_response, 'content_uri'):
+            # Handle case where upload returns a tuple (response, error)
+            if isinstance(upload_response, tuple):
+                actual_response = upload_response[0]
+                error = upload_response[1]
+            else:
+                actual_response = upload_response
+                error = None
+            
+            if hasattr(actual_response, 'content_uri') and actual_response.content_uri and not error:
                 # Send file message
                 content = {
                     "msgtype": "m.file",
@@ -444,7 +457,7 @@ class CleanMatrixBot:
                         "size": file_size,
                         "mimetype": mimetype
                     },
-                    "url": upload_response.content_uri
+                    "url": actual_response.content_uri
                 }
                 
                 response = await self.client.room_send(
@@ -457,7 +470,13 @@ class CleanMatrixBot:
                 print(f"✅ File sent successfully: {filename}")
                 return True
             else:
-                print(f"❌ Failed to upload file: {upload_response}")
+                print(f"❌ Failed to upload file: {actual_response}")
+                if error:
+                    print(f"❌ Upload error: {error}")
+                if hasattr(actual_response, 'status_code'):
+                    print(f"❌ Status code: {actual_response.status_code}")
+                if hasattr(actual_response, 'message'):
+                    print(f"❌ Error message: {actual_response.message}")
                 return False
                 
         except Exception as e:

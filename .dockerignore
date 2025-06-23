@@ -1,0 +1,10 @@
+bot_store/
+test_store/
+temp_media/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.git
+.gitignore
+coverage/

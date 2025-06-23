@@ -32,11 +32,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
 COPY boo_bot.py .
-COPY kjv.txt .
 COPY tests/ tests/
 COPY config/ config/
 COPY config.py .
-COPY logging_setup.py .
+COPY utils/ utils/
 COPY plugins/ plugins/
 
 # Create directories

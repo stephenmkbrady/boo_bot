@@ -212,9 +212,15 @@ class YouTubeProcessor:
                             await send_message_func(room_id, response)
                     else:
                         # Fallback to text if file upload fails
+                        print(f"⚠️ File upload failed, falling back to text paste for {filename}")
+                        if send_message_func:
+                            await send_message_func(room_id, f"{edit_prefix}⚠️ File upload failed, sending as text instead...")
                         await self._send_subtitles_as_text(room_id, title, subtitles, edit_prefix, send_message_func)
                 else:
                     # Fallback to text if no bot instance
+                    print(f"⚠️ No bot instance with send_file method available, falling back to text paste")
+                    if send_message_func:
+                        await send_message_func(room_id, f"{edit_prefix}⚠️ File upload not available, sending as text instead...")
                     await self._send_subtitles_as_text(room_id, title, subtitles, edit_prefix, send_message_func)
                     
             finally:

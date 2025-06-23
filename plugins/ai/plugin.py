@@ -288,7 +288,7 @@ Be creative, weird, and funny while maintaining the {polarity_instruction.lower(
             edit_prefix = "✏️ " if is_edit else ""
             await send_message_func(room_id, f"{edit_prefix}📖 *Consulting the NIST quantum scripture selector...*")
 
-            bible_file = "kjv.txt"
+            bible_file = os.path.join(os.path.dirname(__file__), "kjv.txt")
             if not os.path.exists(bible_file):
                 await send_message_func(room_id, f"{edit_prefix}❌ Bible file (kjv.txt) not found. Please download it from https://openbible.com/textfiles/kjv.txt")
                 return

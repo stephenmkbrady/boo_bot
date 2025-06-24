@@ -11,8 +11,8 @@ class AIProcessor:
     
     def __init__(self):
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.nist_beacon_url = "https://beacon.nist.gov/beacon/2.0/pulse/last"
-        self.openrouter_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.nist_beacon_url = os.getenv("NIST_BEACON_URL", "https://beacon.nist.gov/beacon/2.0/pulse/last")
+        self.openrouter_url = os.getenv("OPENROUTER_API_URL", "https://openrouter.ai/api/v1/chat/completions")
         self.model = "cognitivecomputations/dolphin3.0-mistral-24b:free"
 
     async def get_nist_beacon_random_number(self):

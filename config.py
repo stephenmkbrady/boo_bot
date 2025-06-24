@@ -71,7 +71,7 @@ class BotConfig:
     # Matrix config properties
     @property
     def homeserver(self):
-        return os.getenv("HOMESERVER", "https://matrix.org")
+        return os.getenv("HOMESERVER") or os.getenv("MATRIX_HOMESERVER_URL")
     
     @property
     def user_id(self):

@@ -27,6 +27,12 @@ core:
     admin_users: ${ADMIN_USERS}
     admin_rooms: ${ADMIN_ROOMS}
     allow_config_commands: true
+auth:
+  enabled: true
+  config:
+    api_url: ${DATABASE_URL}
+    api_key: ${API_KEY}
+    timeout: 30
 example:
   enabled: false
   config:

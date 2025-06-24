@@ -520,6 +520,92 @@ Provide a well-structured, comprehensive summary that captures the main themes a
             if send_message_func:
                 await send_message_func(room_id, f"{edit_prefix}❌ Error processing question: {str(e)}")
 
+    async def handle_youtube_direct_qa(self, room_id, url, question, is_edit=False, send_message_func=None):
+        """Process a YouTube video and answer a question about it directly"""
+        try:
+            edit_prefix = "✏️ " if is_edit else ""
+            
+            if send_message_func:
+                await send_message_func(room_id, f"{edit_prefix}🔄 Processing YouTube video for Q&A...")
+            
+            # Check if we already have this video cached
+            if (room_id in self.transcript_cache and 
+                url in self.transcript_cache[room_id]):
+                # Use cached transcript
+                title, transcript, timestamp = self.transcript_cache[room_id][url]
+                if send_message_func:
+                    await send_message_func(room_id, f"{edit_prefix}📋 Using cached transcript for: {title}")
+            else:
+                # Process the video to get transcript
+                result = await self._process_video_for_transcript(url, room_id)
+                if not result:
+                    if send_message_func:
+                        await send_message_func(room_id, f"{edit_prefix}❌ Failed to process video. Please check the URL and try again.")
+                    return
+                
+                title, transcript = result
+                if send_message_func:
+                    await send_message_func(room_id, f"{edit_prefix}✅ Successfully processed: {title}")
+            
+            # Generate answer using AI
+            if send_message_func:
+                await send_message_func(room_id, f"{edit_prefix}🤖 Analyzing video content and generating answer...")
+            
+            answer = await self.answer_question_with_ai(question, transcript, title)
+            
+            if answer:
+                response = f"""{edit_prefix}🎯 **Direct Q&A about "{title}"**
+
+**Q:** {question}
+
+**A:** {answer}
+
+📺 **Video:** {url}"""
+                
+                if send_message_func:
+                    await send_message_func(room_id, response)
+            else:
+                if send_message_func:
+                    await send_message_func(room_id, f"{edit_prefix}❌ Failed to generate answer. Please try again later.")
+                    
+        except Exception as e:
+            print(f"❌ Error handling YouTube direct Q&A: {e}")
+            if send_message_func:
+                await send_message_func(room_id, f"{edit_prefix}❌ Error processing direct Q&A: {str(e)}")
+
+    async def _process_video_for_transcript(self, url, room_id):
+        """Process a YouTube video to extract transcript, return (title, transcript) or None"""
+        try:
+            # Get video title
+            title = await self.get_youtube_title(url)
+            if not title:
+                return None
+            
+            # Get transcript/subtitles
+            transcript = await self.extract_youtube_subtitles(url)
+            if not transcript:
+                return None
+            
+            # Cache the transcript
+            if room_id not in self.transcript_cache:
+                self.transcript_cache[room_id] = OrderedDict()
+            
+            # Store in cache with timestamp
+            self.transcript_cache[room_id][url] = (title, transcript, datetime.now())
+            
+            # Maintain cache size limit per room
+            max_cached = getattr(self, 'max_cached_per_room', 5)
+            room_cache = self.transcript_cache[room_id]
+            while len(room_cache) > max_cached:
+                # Remove oldest entry
+                room_cache.popitem(last=False)
+            
+            return title, transcript
+            
+        except Exception as e:
+            print(f"❌ Error processing video for transcript: {e}")
+            return None
+
     async def answer_question_with_ai(self, question, transcript, title):
         """Answer a question using the video transcript"""
         try:
@@ -609,11 +695,24 @@ class YouTubePlugin(BotPlugin):
 • **youtube summary <URL>** - Get AI summary of video
 • **youtube subs <URL>** - Get video subtitles
 • **youtube <question>** - Ask questions about the last processed video
+• **youtube <URL> <question>** - Ask questions about any video directly
 
 **Examples:**
 • `youtube summary https://youtu.be/dQw4w9WgXcQ`
-• `youtube What are the main points discussed?`"""
+• `youtube What are the main points discussed?`
+• `youtube https://youtu.be/dQw4w9WgXcQ What is this video about?`"""
         
+        # Check for URL + question pattern first
+        url_and_question = self._extract_url_and_question(args)
+        if url_and_question:
+            url, question = url_and_question
+            # Process in background and return immediate feedback
+            asyncio.create_task(
+                self.processor.handle_youtube_direct_qa(room_id, url, question, False, bot_instance.send_message)
+            )
+            return f"🔄 Processing video and analyzing question: {question}"
+        
+        # Handle traditional subcommands
         parts = args.split(" ", 1)
         subcommand = parts[0].lower()
         
@@ -647,6 +746,27 @@ class YouTubePlugin(BotPlugin):
                 self.processor.handle_youtube_question(room_id, question, False, bot_instance.send_message)
             )
             return f"🤖 Analyzing question: {question}"
+    
+    def _extract_url_and_question(self, args: str) -> Optional[Tuple[str, str]]:
+        """Extract YouTube URL and question from command args"""
+        # Look for YouTube URL pattern in the args
+        youtube_patterns = [
+            r'((?:https?://)?(?:www\.)?youtube\.com/watch\?v=[\w-]+)',
+            r'((?:https?://)?(?:www\.)?youtu\.be/[\w-]+)',
+            r'((?:https?://)?(?:www\.)?youtube\.com/embed/[\w-]+)',
+            r'((?:https?://)?(?:www\.)?youtube\.com/v/[\w-]+)'
+        ]
+        
+        for pattern in youtube_patterns:
+            match = re.search(pattern, args)
+            if match:
+                url = match.group(1)
+                # Extract question by removing the URL from args
+                question = args.replace(url, '').strip()
+                if question:  # Only return if there's actually a question
+                    return url, question
+        
+        return None
     
     def _is_youtube_url(self, url: str) -> bool:
         """Check if URL is a valid YouTube URL"""

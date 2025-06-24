@@ -9,18 +9,18 @@ ai:
   config:
     model: "deepseek/deepseek-chat-v3-0324:free" #"cognitivecomputations/dolphin3.0-mistral-24b:free"
     temperature: 0.3
-    max_tokens: 500
+    max_tokens: 800
 
 media:
   enabled: true
   config:
     temp_dir: "./temp_media"
-    max_file_size: "50MB"
+    max_file_size: "100MB"
 
 database:
   enabled: true
   config:
-    api_url: "https://base2.fungus.work"
+    api_url: "https://db.example.com"
     timeout: 30
 
 core:
@@ -29,7 +29,7 @@ core:
     debug_enabled: true
 
 example:
-  enabled: true  # Disabled by default - this is a skeleton/template plugin
+  enabled: false  # Disabled by default - this is a skeleton/template plugin
   config:
     demo_mode: true
     max_echo_length: 1000

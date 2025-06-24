@@ -37,6 +37,8 @@ COPY config/ config/
 COPY config.py .
 COPY utils/ utils/
 COPY plugins/ plugins/
+# Copy root-level test files
+COPY test_*.py ./
 
 # Create directories
 RUN mkdir -p bot_store temp_media test_store logs && \

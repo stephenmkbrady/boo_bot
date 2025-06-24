@@ -228,9 +228,9 @@ class DatabasePlugin(BotPlugin):
             config = BotConfig()
             plugin_config = config.get_plugin_config("database")
             
-            # Get URL from plugin config, API key from environment
+            # Get URL and API key from plugin config (which supports env var interpolation)
             api_url = plugin_config.get("api_url")
-            api_key = config.database_api_key  # From .env file
+            api_key = plugin_config.get("api_key")
             
             if not api_url:
                 self.logger.warning("Database API URL not configured in plugins.yaml - database features disabled")
@@ -241,8 +241,8 @@ class DatabasePlugin(BotPlugin):
                 return True
                 
             if not api_key:
-                self.logger.warning("Database API key not configured in .env - database features disabled")
-                self.logger.warning("Please set DATABASE_API_KEY in .env file")
+                self.logger.warning("Database API key not configured in plugins.yaml - database features disabled")
+                self.logger.warning("Please add 'api_key: \"${DATABASE_API_KEY}\"' to database config in plugins.yaml")
                 self.enabled = False
                 bot_instance.db_enabled = False
                 bot_instance.db_client = None

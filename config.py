@@ -1,4 +1,5 @@
 import os
+import re
 import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -27,12 +28,25 @@ class BotConfig:
                         os.environ[key] = value
     
     def _load_plugin_config(self) -> Dict[str, Any]:
-        """Load plugin configuration from YAML"""
+        """Load plugin configuration from YAML with environment variable interpolation"""
         config_file = Path("config/plugins.yaml")
         if config_file.exists():
             with open(config_file) as f:
-                return yaml.safe_load(f) or {}
+                content = f.read()
+                # Replace ${VAR_NAME} with environment variable values
+                content = self._substitute_env_vars(content)
+                return yaml.safe_load(content) or {}
         return {}
+    
+    def _substitute_env_vars(self, content: str) -> str:
+        """Substitute ${VAR_NAME} patterns with environment variable values"""
+        def replace_var(match):
+            var_name = match.group(1)
+            return os.getenv(var_name, match.group(0))  # Return original if env var not found
+        
+        # Match ${VAR_NAME} pattern
+        pattern = r'\$\{([A-Z_][A-Z0-9_]*)\}'
+        return re.sub(pattern, replace_var, content)
     
     def is_plugin_enabled(self, plugin_name: str) -> bool:
         """Check if plugin is enabled in config"""

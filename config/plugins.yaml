@@ -20,7 +20,8 @@ media:
 database:
   enabled: true
   config:
-    api_url: "https://db.example.com"
+    api_url: "${DATABASE_API_URL}"
+    api_key: "${DATABASE_API_KEY}"
     timeout: 30
 
 core:

@@ -35,6 +35,7 @@ COPY boo_bot.py .
 COPY tests/ tests/
 COPY config/ config/
 COPY config.py .
+COPY config_manager.py .
 COPY utils/ utils/
 COPY plugins/ plugins/
 # Copy root-level test files

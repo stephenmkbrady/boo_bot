@@ -1,6 +1,8 @@
 from typing import List, Optional
 import logging
 from plugins.plugin_interface import BotPlugin
+from config import BotConfig
+from config_manager import ConfigManager
 
 
 class CorePlugin(BotPlugin):
@@ -14,6 +16,7 @@ class CorePlugin(BotPlugin):
     async def initialize(self, bot_instance) -> bool:
         """Initialize plugin with bot instance"""
         self.bot = bot_instance
+        self.config_manager = ConfigManager()
         self.logger.info("Core plugin initialized successfully")
         return True
     
@@ -47,7 +50,7 @@ class CorePlugin(BotPlugin):
             elif command == "disable":
                 return await self._handle_disable(args, bot_instance)
             elif command == "config":
-                return await self._handle_config(args, bot_instance)
+                return await self._handle_config(args, room_id, user_id, bot_instance)
             elif command == "room":
                 return await self._handle_room_command(room_id, bot_instance)
             elif command in ["refresh", "update"] and args == "name":
@@ -206,25 +209,124 @@ Power Level: {room.power_levels.get(bot_instance.user_id, 0)}"""
         except Exception as e:
             return f"❌ Error refreshing name: {str(e)}"
     
-    async def _handle_config(self, args: str, bot_instance) -> str:
-        """Handle config command"""
+    async def _handle_config(self, args: str, room_id: str, user_id: str, bot_instance) -> str:
+        """Handle config command with authorization"""
         if not bot_instance.plugin_manager:
             return "❌ Plugin manager not available"
         
-        args = args.strip().lower()
+        # Check authorization for config commands
+        config = BotConfig()
+        if not config.is_authorized_for_config(user_id, room_id):
+            return "❌ You are not authorized to use config commands in this room"
         
-        if args == "reload":
-            try:
-                await bot_instance.plugin_manager._handle_config_change()
-                return "✅ Configuration reloaded - all plugins restarted with new config"
-            except Exception as e:
-                return f"❌ Error reloading configuration: {str(e)}"
-        elif args == "":
-            return """⚙️ **Configuration Commands:**
-
-• `config reload` - Reload plugins.yaml and restart all plugins
-• `config` - Show this help
-
-**Note:** Configuration changes in `config/plugins.yaml` are automatically detected and applied via hot reloading."""
+        args = args.strip()
+        if not args:
+            return self._get_config_help()
+        
+        parts = args.split()
+        subcommand = parts[0].lower()
+        
+        if subcommand == "reload":
+            return await self._handle_config_reload(bot_instance)
+        elif subcommand == "list":
+            return await self._handle_config_list(parts[1:])
+        elif subcommand == "get":
+            return await self._handle_config_get(parts[1:])
+        elif subcommand == "set":
+            return await self._handle_config_set(parts[1:], bot_instance)
         else:
-            return "❌ Unknown config command. Use `config` for help."
+            return f"❌ Unknown config command '{subcommand}'. Use `config` for help."
+    
+    def _get_config_help(self) -> str:
+        """Get configuration help text"""
+        return """⚙️ **Configuration Commands:**
+
+**General:**
+• `config` - Show this help
+• `config reload` - Reload plugins.yaml and restart all plugins
+
+**Plugin Configuration:**
+• `config list <plugin>` - Show all settings for a plugin
+• `config get <plugin> <setting>` - Get current value of a setting
+• `config set <plugin> <setting> <value>` - Set a plugin setting
+
+**Examples:**
+• `config list ai` - Show all AI plugin settings
+• `config get ai model` - Get current AI model
+• `config set ai model "new-model-name"` - Set AI model
+• `config set ai temperature 0.7` - Set AI temperature
+• `config set youtube max_cached_per_room 10` - Set YouTube cache limit
+
+**Security:** Only authorized users in authorized rooms can use config commands.
+**Note:** Settings are automatically validated and applied with hot reloading."""
+    
+    async def _handle_config_reload(self, bot_instance) -> str:
+        """Handle config reload command"""
+        try:
+            await bot_instance.plugin_manager._handle_config_change()
+            self.config_manager.cleanup_backup()
+            return "✅ Configuration reloaded - all plugins restarted with new config"
+        except Exception as e:
+            return f"❌ Error reloading configuration: {str(e)}"
+    
+    async def _handle_config_list(self, args: List[str]) -> str:
+        """Handle config list command"""
+        if len(args) != 1:
+            return "❌ Usage: `config list <plugin>`"
+        
+        plugin_name = args[0].lower()
+        success, error, settings = self.config_manager.list_plugin_settings(plugin_name)
+        
+        if not success:
+            return f"❌ {error}"
+        
+        if not settings:
+            return f"📋 Plugin '{plugin_name}' has no settings configured"
+        
+        result = [f"📋 **{plugin_name.title()} Plugin Settings:**\n"]
+        for key, value in settings.items():
+            if isinstance(value, str) and len(str(value)) > 50:
+                value = str(value)[:47] + "..."
+            result.append(f"• `{key}`: {value}")
+        
+        return "\n".join(result)
+    
+    async def _handle_config_get(self, args: List[str]) -> str:
+        """Handle config get command"""
+        if len(args) != 2:
+            return "❌ Usage: `config get <plugin> <setting>`"
+        
+        plugin_name, setting = args[0].lower(), args[1]
+        success, error, value = self.config_manager.get_plugin_setting(plugin_name, setting)
+        
+        if not success:
+            return f"❌ {error}"
+        
+        return f"⚙️ `{plugin_name}.{setting}` = `{value}`"
+    
+    async def _handle_config_set(self, args: List[str], bot_instance) -> str:
+        """Handle config set command"""
+        if len(args) < 3:
+            return "❌ Usage: `config set <plugin> <setting> <value>`"
+        
+        plugin_name = args[0].lower()
+        setting = args[1]
+        value = " ".join(args[2:])  # Join remaining parts as value
+        
+        # Validate the setting change
+        is_valid, error, parsed_value = self.config_manager.validate_plugin_setting(plugin_name, setting, value)
+        if not is_valid:
+            return f"❌ {error}"
+        
+        # Apply the setting
+        success, error = self.config_manager.set_plugin_setting(plugin_name, setting, parsed_value)
+        if not success:
+            return f"❌ {error}"
+        
+        # Trigger hot reload
+        try:
+            await bot_instance.plugin_manager._handle_config_change()
+            self.config_manager.cleanup_backup()
+            return f"✅ Set `{plugin_name}.{setting}` = `{parsed_value}` (plugins reloaded)"
+        except Exception as e:
+            return f"⚠️ Setting updated but reload failed: {str(e)}"

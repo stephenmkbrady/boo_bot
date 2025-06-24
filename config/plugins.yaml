@@ -1,36 +1,34 @@
 youtube:
   enabled: true
   config:
-    max_cached_per_room: 5
+    max_cached_per_room: 10
     chunk_size: 8000
-
 ai:
   enabled: true
   config:
-    model: "deepseek/deepseek-chat-v3-0324:free" #"cognitivecomputations/dolphin3.0-mistral-24b:free"
+    model: deepseek/deepseek-chat-v3-0324:free
     temperature: 0.3
     max_tokens: 800
-
 media:
   enabled: true
   config:
-    temp_dir: "./temp_media"
-    max_file_size: "100MB"
-
+    temp_dir: ./temp_media
+    max_file_size: 100MB
 database:
   enabled: true
   config:
-    api_url: "${DATABASE_API_URL}"
-    api_key: "${DATABASE_API_KEY}"
+    api_url: ${DATABASE_API_URL}
+    api_key: ${DATABASE_API_KEY}
     timeout: 30
-
 core:
   enabled: true
   config:
     debug_enabled: true
-
+    admin_users: ${ADMIN_USERS}
+    admin_rooms: ${ADMIN_ROOMS}
+    allow_config_commands: true
 example:
-  enabled: false  # Disabled by default - this is a skeleton/template plugin
+  enabled: false
   config:
     demo_mode: true
     max_echo_length: 1000

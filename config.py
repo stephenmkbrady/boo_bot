@@ -42,9 +42,20 @@ class BotConfig:
         """Substitute ${VAR_NAME} patterns with environment variable values"""
         def replace_var(match):
             var_name = match.group(1)
-            return os.getenv(var_name, match.group(0))  # Return original if env var not found
+            env_value = os.getenv(var_name)
+            if env_value is None:
+                return match.group(0)  # Return original if env var not found
+            
+            # Special handling for list variables (comma-separated)
+            if var_name in ['ADMIN_USERS', 'ADMIN_ROOMS']:
+                # Convert comma-separated string to JSON-style YAML list
+                items = [item.strip() for item in env_value.split(',') if item.strip()]
+                # Use JSON-style list format that's valid YAML (no outer quotes)
+                return '[' + ', '.join(f'"{item}"' for item in items) + ']'
+            
+            return env_value
         
-        # Match ${VAR_NAME} pattern
+        # Match ${VAR_NAME} pattern  
         pattern = r'\$\{([A-Z_][A-Z0-9_]*)\}'
         return re.sub(pattern, replace_var, content)
     
@@ -92,3 +103,29 @@ class BotConfig:
     
     def get_feature_config(self, feature_name: str) -> Dict[str, Any]:
         return self.get_plugin_config(feature_name)
+    
+    # Admin authorization methods
+    def is_admin_user(self, user_id: str) -> bool:
+        """Check if user is authorized for admin commands"""
+        core_config = self.get_plugin_config("core")
+        admin_users = core_config.get("admin_users", [])
+        return user_id in admin_users
+    
+    def is_admin_room(self, room_id: str) -> bool:
+        """Check if room allows admin commands"""
+        core_config = self.get_plugin_config("core")
+        admin_rooms = core_config.get("admin_rooms", [])
+        return room_id in admin_rooms
+    
+    def are_config_commands_allowed(self) -> bool:
+        """Check if config commands are globally enabled"""
+        core_config = self.get_plugin_config("core")
+        return core_config.get("allow_config_commands", False)
+    
+    def is_authorized_for_config(self, user_id: str, room_id: str) -> bool:
+        """Check if user is authorized to run config commands in this room"""
+        return (
+            self.are_config_commands_allowed() and
+            self.is_admin_user(user_id) and
+            self.is_admin_room(room_id)
+        )

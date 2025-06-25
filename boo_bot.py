@@ -834,7 +834,10 @@ class CleanMatrixBot:
             r'^\*\s',  # * bullet points
             r'^\d+\.\s',  # 1. numbered lists
         ]
-        return any(re.search(pattern, text, re.MULTILINE) for pattern in patterns)
+        # Also check for newlines - they need HTML formatting
+        has_patterns = any(re.search(pattern, text, re.MULTILINE) for pattern in patterns)
+        has_newlines = '\n' in text
+        return has_patterns or has_newlines
 
     def _convert_markdown_to_html(self, text: str) -> str:
         """Convert basic markdown syntax to HTML for Matrix"""
@@ -860,9 +863,11 @@ class CleanMatrixBot:
         text = re.sub(r'(<li>.*?</li>)\n?(?=<li>)', r'\1', text, flags=re.DOTALL)
         text = re.sub(r'(<li>.*?</li>(?:\n<li>.*?</li>)*)', r'<ul>\1</ul>', text, flags=re.DOTALL)
         
-        # Convert newlines to <br/> - handle double newlines as paragraph breaks
-        text = re.sub(r'\n\n+', '<br/><br/>', text)  # Double+ newlines = paragraph break
-        text = re.sub(r'(?<!</h[1-6]>)(?<!<br/>)\n(?!<[/]?(?:h[1-6]|ul|li))', '<br/>', text)  # Single newlines = line break
+        # Convert newlines to <br/> - simpler approach
+        # First handle double+ newlines as paragraph breaks
+        text = text.replace('\n\n', '<br/><br/>')
+        # Then handle remaining single newlines
+        text = text.replace('\n', '<br/>')
         
         return text
 

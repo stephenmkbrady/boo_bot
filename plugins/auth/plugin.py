@@ -95,31 +95,31 @@ class AuthPlugin(BotPlugin):
                         self.logger.info(f"✅ PIN generated successfully for room {room_id[:20]}...")
                         
                         return (
-                            f"🔐 **Room Access PIN**: `{pin}`\\n\\n"
-                            f"📝 Use this PIN in the web interface to access messages from this room.\\n"
-                            f"⏰ **Expires**: {exp_str}\\n"
-                            f"🔄 **Rate limit**: 3 requests per hour per room\\n\\n"
+                            f"🔐 **Room Access PIN**: `{pin}`\n\n"
+                            f"📝 Use this PIN in the web interface to access messages from this room.\n"
+                            f"⏰ **Expires**: {exp_str}\n"
+                            f"🔄 **Rate limit**: 3 requests per hour per room\n\n"
                             f"💡 Enter this PIN when prompted in the web dashboard to view room messages."
                         )
                     
                     elif response.status == 429:
                         self.logger.warning(f"Rate limit exceeded for room {room_id[:20]}...")
                         return (
-                            f"⏱️ **Rate limit exceeded**\\n\\n"
-                            f"This room has reached the maximum of 3 PIN requests per hour.\\n"
+                            f"⏱️ **Rate limit exceeded**\n\n"
+                            f"This room has reached the maximum of 3 PIN requests per hour.\n"
                             f"Please wait and try again later, or use the existing PIN if it hasn't expired."
                         )
                     
                     elif response.status == 503:
                         return (
-                            f"🚫 **PIN authentication is currently disabled**\\n\\n"
+                            f"🚫 **PIN authentication is currently disabled**\n\n"
                             f"Please contact the administrator."
                         )
                     
                     elif response.status == 401:
                         self.logger.error("API authentication failed - invalid API key")
                         return (
-                            f"❌ **Authentication failed**\\n\\n"
+                            f"❌ **Authentication failed**\n\n"
                             f"Bot is not properly configured for PIN requests. Please contact the administrator."
                         )
                     
@@ -127,28 +127,28 @@ class AuthPlugin(BotPlugin):
                         error_text = await response.text()
                         self.logger.error(f"PIN request failed: {response.status} - {error_text}")
                         return (
-                            f"❌ **PIN request failed**\\n\\n"
+                            f"❌ **PIN request failed**\n\n"
                             f"Server responded with error {response.status}. Please try again later."
                         )
                         
         except asyncio.TimeoutError:
             self.logger.error("PIN request timed out")
             return (
-                f"⏰ **Request timed out**\\n\\n"
+                f"⏰ **Request timed out**\n\n"
                 f"The database server is not responding. Please try again later."
             )
             
         except aiohttp.ClientError as e:
             self.logger.error(f"Network error during PIN request: {e}")
             return (
-                f"🌐 **Network error**\\n\\n"
+                f"🌐 **Network error**\n\n"
                 f"Could not connect to database server. Please try again later."
             )
             
         except Exception as e:
             self.logger.error(f"Unexpected error during PIN request: {e}")
             return (
-                f"❌ **Unexpected error**\\n\\n"
+                f"❌ **Unexpected error**\n\n"
                 f"Failed to process PIN request: {str(e)}"
             )
     

@@ -84,17 +84,32 @@ class CorePlugin(BotPlugin):
             return "❌ Plugin system not available"
         
         commands = bot_instance.plugin_manager.get_all_commands()
-        help_text = f"🤖 **{bot_instance.current_display_name} Commands:**\n\n"
+        help_text = f"🤖 **{bot_instance.current_display_name} Command Reference**\n\n"
         
-        # Group commands by plugin
+        # Group commands by plugin with icons
         by_plugin = {}
         for cmd, plugin_name in commands.items():
             if plugin_name not in by_plugin:
                 by_plugin[plugin_name] = []
             by_plugin[plugin_name].append(cmd)
         
-        for plugin_name, cmds in by_plugin.items():
-            help_text += f"**{plugin_name.title()}:** {', '.join(cmds)}\n"
+        # Plugin icons mapping
+        plugin_icons = {
+            'core': '⚙️',
+            'ai': '🧠', 
+            'youtube': '📺',
+            'database': '💾',
+            'auth': '🔐'
+        }
+        
+        # Sort plugins for consistent display
+        for plugin_name in sorted(by_plugin.keys()):
+            cmds = by_plugin[plugin_name]
+            icon = plugin_icons.get(plugin_name, '🔌')
+            help_text += f"{icon} **{plugin_name.title()}:** `{', '.join(sorted(cmds))}`\n"
+        
+        help_text += f"\n💡 **Usage:** `!command` or `{bot_instance.current_display_name}: command`"
+        help_text += f"\n📖 **Example:** `!help` or `{bot_instance.current_display_name}: youtube summary <url>`"
         
         return help_text
     

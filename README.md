@@ -1,6 +1,12 @@
 # Boo Bot
 
-Matrix chatbot with modular plugin architecture for AI features, YouTube processing, and database integration.
+![Space Hamster](test_data/test.jpg)
+
+<div align="center">
+<i>"Space hamsters are never wrong! - Minsc"</i>
+</div>
+
+Matrix chatbot with modular plugin architecture for AI features, YouTube processing, database integration, and more!
 
 ## 🚀 Quick Start
 
@@ -116,16 +122,30 @@ myplugin:
 
 ```bash
 # Run all tests
-docker-compose run --rm boo_bot_tests
+docker-compose exec boo_bot python -m pytest tests/ -v
 
 # Run with coverage
-docker-compose run --rm boo_bot_tests python -m pytest tests/ --cov=boo_bot --cov=api_client --cov-report=html -v
+docker-compose exec boo_bot python -m pytest tests/ --cov=boo_bot --cov=plugins --cov-report=html -v
 
-# Run specific tests
-docker-compose run --rm boo_bot_tests python -m pytest tests/test_api_client.py -v
+# Run specific test suites
+docker-compose exec boo_bot python -m pytest tests/test_api_client.py -v
+docker-compose exec boo_bot python -m pytest tests/test_automated_file_cycle.py -v
+
+# Run storage integration tests
+docker-compose exec boo_bot python -m pytest tests/test_storage_simple.py -v
 ```
 
-**Current Coverage**: 25% overall (77% api_client, 19% boo_bot)
+### Test Data
+
+The test suite includes sample media files for testing file upload/download cycles:
+
+- **`test_data/test.jpg`** - Sample JPEG image (1.4MB) used for:
+  - File integrity testing (SHA256 hash verification)
+  - Upload/download cycle validation
+  - Media storage API integration tests
+  - Encrypted media decryption testing
+
+**Current Coverage**: 84 tests passing, 5 skipped (complex async mocking)
 
 ## 🏗️ Architecture
 

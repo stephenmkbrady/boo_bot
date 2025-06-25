@@ -34,20 +34,20 @@ def test_config_loading():
             print("\n✅ Database configuration loaded successfully!")
             print("   - URL from plugins.yaml ✅")
             print("   - API key from .env ✅")
-            return True
+            assert True, "Configuration loaded successfully"
         else:
             print("\n❌ Database configuration incomplete!")
             if not api_url:
                 print("   - Missing api_url in plugins.yaml")
             if not api_key:
                 print("   - Missing DATABASE_API_KEY in .env")
-            return False
+            assert False, "Database configuration incomplete"
             
     except Exception as e:
         print(f"❌ Error loading configuration: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        assert False, f"Error loading configuration: {e}"
 
 if __name__ == "__main__":
     success = test_config_loading()

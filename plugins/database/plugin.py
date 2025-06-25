@@ -3,6 +3,7 @@ import logging
 import aiohttp
 import aiofiles
 import json
+import mimetypes
 from datetime import datetime
 from pathlib import Path
 from plugins.plugin_interface import BotPlugin
@@ -139,11 +140,15 @@ class ChatDatabaseClient:
                 # Read and add file
                 async with aiofiles.open(file_path, 'rb') as f:
                     file_content = await f.read()
+                    # Detect proper MIME type based on file extension
+                    mime_type, _ = mimetypes.guess_type(file_path.name)
+                    content_type = mime_type or 'application/octet-stream'
+                    
                     data.add_field(
                         'file', 
                         file_content,
                         filename=file_path.name,
-                        content_type='application/octet-stream'
+                        content_type=content_type
                     )
                 
                 async with session.post(

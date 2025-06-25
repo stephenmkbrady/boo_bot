@@ -123,10 +123,27 @@ class CleanMatrixBot:
         self.current_display_name = None
         self.last_name_check = None
 
-        # Initialize Matrix client
+        # Initialize Matrix client with device persistence
         try:
-            self.client = AsyncClient(homeserver, user_id, store_path=self.store_path)
-            print("✅ AsyncClient initialized successfully")
+            # Define consistent device ID and credentials file
+            self.device_id = "CleanMatrixBot_Device"
+            self.credentials_file = os.path.join(self.store_path, "credentials.json")
+            
+            # Configure client with persistent device ID
+            from nio import ClientConfig
+            config = ClientConfig(
+                store_sync_tokens=True,
+                encryption_enabled=True
+            )
+            
+            self.client = AsyncClient(
+                homeserver, 
+                user_id, 
+                device_id=self.device_id,
+                store_path=self.store_path,
+                config=config
+            )
+            print(f"✅ AsyncClient initialized with device ID: {self.device_id}")
         except Exception as e:
             print(f"❌ Failed to initialize AsyncClient: {e}")
             raise
@@ -806,16 +823,110 @@ class CleanMatrixBot:
         except Exception as e:
             print(f"❌ Error sharing room keys: {e}")
 
-    async def send_message(self, room_id, message):
-        """Send a message to a room"""
+    def _has_markdown_formatting(self, text: str) -> bool:
+        """Check if text contains markdown-style formatting"""
+        patterns = [
+            r'\*\*.*?\*\*',  # **bold**
+            r'\*[^*].*?[^*]\*',  # *italic* (not part of **)
+            r'`.*?`',  # `code`
+            r'^#{1,6}\s',  # # headers
+            r'^•\s',  # • bullet points
+            r'^\*\s',  # * bullet points
+            r'^\d+\.\s',  # 1. numbered lists
+        ]
+        return any(re.search(pattern, text, re.MULTILINE) for pattern in patterns)
+
+    def _convert_markdown_to_html(self, text: str) -> str:
+        """Convert basic markdown syntax to HTML for Matrix"""
+        # Convert **bold** to <strong>bold</strong>
+        text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)
+        
+        # Convert *italic* to <em>italic</em> (but not if it's part of **)
+        text = re.sub(r'(?<!\*)\*([^*]+?)\*(?!\*)', r'<em>\1</em>', text)
+        
+        # Convert `code` to <code>code</code>
+        text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)
+        
+        # Convert # headers to <h1>, ## to <h2>, etc.
+        text = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', text, flags=re.MULTILINE)
+        text = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', text, flags=re.MULTILINE)
+        text = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', text, flags=re.MULTILINE)
+        
+        # Convert bullet points
+        text = re.sub(r'^• (.*?)$', r'<li>\1</li>', text, flags=re.MULTILINE)
+        text = re.sub(r'^\* (.*?)$', r'<li>\1</li>', text, flags=re.MULTILINE)
+        
+        # Wrap consecutive <li> items in <ul>
+        text = re.sub(r'(<li>.*?</li>)\n?(?=<li>)', r'\1', text, flags=re.DOTALL)
+        text = re.sub(r'(<li>.*?</li>(?:\n<li>.*?</li>)*)', r'<ul>\1</ul>', text, flags=re.DOTALL)
+        
+        # Convert newlines to <br/> - handle double newlines as paragraph breaks
+        text = re.sub(r'\n\n+', '<br/><br/>', text)  # Double+ newlines = paragraph break
+        text = re.sub(r'(?<!</h[1-6]>)(?<!<br/>)\n(?!<[/]?(?:h[1-6]|ul|li))', '<br/>', text)  # Single newlines = line break
+        
+        return text
+
+    def _save_credentials(self, access_token: str):
+        """Save login credentials to disk for device persistence"""
         try:
+            credentials = {
+                "user_id": self.user_id,
+                "device_id": self.device_id,
+                "access_token": access_token,
+                "homeserver": self.homeserver
+            }
+            with open(self.credentials_file, 'w') as f:
+                json.dump(credentials, f, indent=2)
+            print(f"💾 Credentials saved to {self.credentials_file}")
+        except Exception as e:
+            print(f"❌ Failed to save credentials: {e}")
+
+    def _load_credentials(self) -> dict:
+        """Load saved credentials from disk"""
+        try:
+            if os.path.exists(self.credentials_file):
+                with open(self.credentials_file, 'r') as f:
+                    credentials = json.load(f)
+                print(f"📂 Loaded credentials from {self.credentials_file}")
+                return credentials
+            else:
+                print(f"📂 No saved credentials found at {self.credentials_file}")
+                return None
+        except Exception as e:
+            print(f"❌ Failed to load credentials: {e}")
+            return None
+
+    def _delete_credentials(self):
+        """Delete saved credentials (for fresh login)"""
+        try:
+            if os.path.exists(self.credentials_file):
+                os.remove(self.credentials_file)
+                print(f"🗑️ Deleted credentials file: {self.credentials_file}")
+        except Exception as e:
+            print(f"❌ Failed to delete credentials: {e}")
+
+    async def send_message(self, room_id, message):
+        """Send a message to a room with proper Matrix formatting"""
+        try:
+            # Check if message contains markdown-style formatting
+            if self._has_markdown_formatting(message):
+                html_content = self._convert_markdown_to_html(message)
+                content = {
+                    "msgtype": "m.text",
+                    "body": message,  # Plain text version
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": html_content  # HTML version
+                }
+            else:
+                content = {
+                    "msgtype": "m.text",
+                    "body": message
+                }
+            
             response = await self.client.room_send(
                 room_id=room_id,
                 message_type="m.room.message",
-                content={
-                    "msgtype": "m.text",
-                    "body": message
-                },
+                content=content,
                 ignore_unverified_devices=True
             )
             print(f"📤 Message sent: {message[:50]}{'...' if len(message) > 50 else ''}")
@@ -1018,13 +1129,59 @@ Bot Display Name: {self.current_display_name}"""
 
     # Standard Matrix bot methods (login, join_room, etc.)
     async def login(self):
-        """Login to Matrix server"""
+        """Login to Matrix server using stored credentials or password"""
         print("🔐 Attempting to login to Matrix server...")
+        
+        # Try to restore from saved credentials first
+        credentials = self._load_credentials()
+        if credentials:
+            try:
+                print(f"🔑 Attempting to restore login with saved credentials...")
+                self.client.restore_login(
+                    user_id=credentials["user_id"],
+                    device_id=credentials["device_id"],
+                    access_token=credentials["access_token"]
+                )
+                print(f"✅ Restored login as {self.user_id} with device {self.device_id}")
+                
+                # Test if credentials are still valid
+                try:
+                    await self.client.sync(timeout=5000, full_state=False)
+                    print("✅ Credentials are valid - login successful")
+                    
+                    # Continue with post-login setup
+                    await self.update_command_prefix()
+                    await self._debug_encryption_setup()
+                    
+                    if self.client.olm:
+                        print("✅ Encryption enabled and ready")
+                        self.client.blacklist_device = lambda device: False
+                        await self.setup_encryption_keys()
+                    else:
+                        print("❌ Encryption not available - check matrix-nio[e2e] installation")
+                    
+                    return True
+                    
+                except Exception as e:
+                    print(f"⚠️ Saved credentials are invalid: {e}")
+                    print("🔄 Falling back to password login...")
+                    self._delete_credentials()
+                    
+            except Exception as e:
+                print(f"⚠️ Failed to restore credentials: {e}")
+                print("🔄 Falling back to password login...")
+                self._delete_credentials()
+        
+        # Fall back to password login
         try:
+            print("🔐 Performing password login...")
             response = await self.client.login(self.password, device_name=self.device_name)
             
             if isinstance(response, LoginResponse):
-                print(f"✅ Logged in as {self.user_id}")
+                print(f"✅ Password login successful as {self.user_id}")
+                
+                # Save credentials for future use
+                self._save_credentials(response.access_token)
                 
                 # Update command prefix after login - with delay to allow sync
                 print("⏳ Waiting 2 seconds for Matrix sync before getting display name...")
@@ -1043,10 +1200,10 @@ Bot Display Name: {self.current_display_name}"""
                 
                 return True
             else:
-                print(f"❌ Login failed: {response}")
+                print(f"❌ Password login failed: {response}")
                 return False
         except Exception as e:
-            print(f"❌ Login error: {e}")
+            print(f"❌ Password login error: {e}")
             return False
 
     async def join_room(self, room_id):
